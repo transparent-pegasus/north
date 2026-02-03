@@ -1,10 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { defineSecret, defineString } from "firebase-functions/params";
+import { defineSecret } from "firebase-functions/params";
+import { config } from "./config";
 
 export const googleApiKey = defineSecret("GOOGLE_API_KEY");
-const geminiModel = defineString("GEMINI_MODEL", {
-  default: "gemini-2.0-flash-exp",
-});
 
 let genAI: GoogleGenerativeAI | null = null;
 
@@ -17,7 +15,7 @@ function getModel() {
     genAI = new GoogleGenerativeAI(apiKey);
   }
 
-  return genAI.getGenerativeModel({ model: geminiModel.value() });
+  return genAI.getGenerativeModel({ model: config.gemini.model });
 }
 
 const TIMEOUT_MS = 300000; // 300 seconds

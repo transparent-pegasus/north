@@ -2,7 +2,7 @@
 
 import { GoogleAuthProvider, signInAnonymously, signInWithPopup } from "firebase/auth";
 import { useState } from "react";
-
+import { config } from "@/lib/config";
 import { auth } from "@/lib/firebase";
 
 function CompassLogoLarge() {
@@ -113,7 +113,7 @@ export default function TitleScreen() {
               Sign in with Google
             </Button>
 
-            {process.env.NEXT_PUBLIC_SHOW_DEBUG === "true" && (
+            {config.showDebug && (
               <Button
                 onPress={handleAnonymousLogin}
                 isLoading={anonLoading}
@@ -128,13 +128,10 @@ export default function TitleScreen() {
 
           {error && <p className="text-danger text-sm">{error}</p>}
 
-          {process.env.NEXT_PUBLIC_SHOW_DEBUG === "true" && (
+          {config.showDebug && (
             <div className="mt-4 text-xs text-center text-default-400">
               <p>
-                Mode:{" "}
-                {process.env.NODE_ENV === "production"
-                  ? "Local Build (Debug)"
-                  : "Development (Hot Reload)"}
+                Mode: {config.isProduction ? "Local Build (Debug)" : "Development (Hot Reload)"}
               </p>
             </div>
           )}

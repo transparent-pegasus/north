@@ -7,7 +7,7 @@ import { useModal } from "@/components/ModalProvider";
 import RefineProposalModal from "@/components/RefineProposalModal";
 import ResearchModal from "@/components/ResearchModal";
 import { apiFetch } from "@/lib/api";
-
+import { config } from "@/lib/config";
 import type { RefinementData } from "@/types";
 
 interface DecompositionProposal {
@@ -53,11 +53,7 @@ export default function ControlPanel({
   const [isRefineModalOpen, setIsRefineModalOpen] = useState(false);
   const [usage, setUsage] = useState({ decompose: 0, refine: 0, research: 0 });
 
-  const LIMITS = {
-    decompose: Number(process.env.NEXT_PUBLIC_LIMIT_DECOMPOSE) || 3,
-    refine: Number(process.env.NEXT_PUBLIC_LIMIT_REFINE) || 3,
-    research: Number(process.env.NEXT_PUBLIC_LIMIT_RESEARCH) || 3,
-  };
+  const LIMITS = config.limits;
 
   const fetchUsage = useCallback(async () => {
     try {

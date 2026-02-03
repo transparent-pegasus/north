@@ -4,15 +4,14 @@
  * In development, API calls go to the local Next.js API routes or Functions emulator.
  */
 
-const isProduction = process.env.NODE_ENV === "production";
-const isDebug = process.env.NEXT_PUBLIC_SHOW_DEBUG === "true";
+import { config } from "./config";
 
 // In production (without debug flag), we should NEVER use a localhost URL.
 // If NEXT_PUBLIC_API_URL is set to localhost but we are in production, ignore it.
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+const rawApiUrl = config.api.baseUrl;
 const isLocalhostUrl = rawApiUrl.includes("localhost") || rawApiUrl.includes("127.0.0.1");
 
-const API_BASE_URL = isProduction && !isDebug && isLocalhostUrl ? "" : rawApiUrl;
+const API_BASE_URL = config.isProduction && !config.isDebug && isLocalhostUrl ? "" : rawApiUrl;
 
 /**
  * Get the full URL for an API endpoint.

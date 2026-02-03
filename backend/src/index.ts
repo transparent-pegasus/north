@@ -8,6 +8,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onRequest } from "firebase-functions/v2/https";
+import { config } from "./config";
 
 import { applyDecomposition, decompose } from "./decomposition";
 import { applyRefine, suggestRefine } from "./refinement";
@@ -100,11 +101,7 @@ const checkAuthMiddleware: express.RequestHandler = async (req, res, next) => {
 
 app.use(checkAuthMiddleware);
 
-const RATE_LIMITS = {
-  decompose: Number(process.env.LIMIT_DECOMPOSE) || 3,
-  refine: Number(process.env.LIMIT_REFINE) || 3,
-  research: Number(process.env.LIMIT_RESEARCH) || 3,
-};
+const RATE_LIMITS = config.limits;
 
 const rateLimitMiddleware = (actionType: keyof typeof RATE_LIMITS): express.RequestHandler => {
   return async (req, res, next) => {
