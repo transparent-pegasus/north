@@ -453,6 +453,27 @@ app.post("/research/auto", rateLimitMiddleware("research"), async (req, res) => 
   }
 });
 
+app.post("/research/manual", async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { nodeId, title, url, snippet } = req.body;
+    const { saveResearchSearchResults } = require("./tree");
+
+    const item = {
+      title: title || "Manual Entry",
+      url: url || "",
+      snippet: snippet || "",
+    };
+
+    // Save as a "manual" source result
+    await saveResearchSearchResults(uid, nodeId, "manual", ["Manual Entry"], [item]);
+
+    res.json({ success: true, item });
+  } catch (error: any) {
+    handleError(res, error);
+  }
+});
+
 app.get("/user/limits", async (req, res) => {
   try {
     const uid = req.user.uid;

@@ -282,29 +282,55 @@ export async function saveResearchResult(
   summary: string,
   url: string,
 ): Promise<Tree> {
-  const tree = await getTree(userId);
-  const ideal = tree.goal.idealStates.find((i) => i.id === nodeId);
+  console.log(`[saveResearchResult] Starting for User: ${userId}, Node: ${nodeId}`);
 
-  if (!ideal) throw new Error("Target node not found");
+  return await db.runTransaction(async (transaction) => {
+    const userRoot = getUserRoot(userId);
+    const indexRef = userRoot.collection(META_COLLECTION).doc(INDEX_DOC);
+    const indexDoc = await transaction.get(indexRef);
 
-  const result = {
-    createdAt: new Date().toISOString(),
-    id: randomUUID(),
-    keywords,
-    results: [
-      {
-        snippet: summary,
-        title: "Research Summary",
-        url,
-      },
-    ],
-    source: source as any,
-  };
+    if (!indexDoc.exists) throw new Error("User index not found");
+    const index = indexDoc.data() as TreeIndex;
+    const treeId = index.activeTreeId;
 
-  ideal.researchResults.push(result);
-  await saveTree(userId, tree);
+    if (!treeId) throw new Error("No active tree found");
 
-  return tree;
+    const treeRef = userRoot.collection(TREES_COLLECTION).doc(treeId);
+    const treeDoc = await transaction.get(treeRef);
+
+    if (!treeDoc.exists) throw new Error("Active tree not found");
+
+    const tree = treeDoc.data() as Tree;
+    const ideal = tree.goal.idealStates.find((i) => i.id === nodeId);
+
+    if (!ideal) {
+      console.error(
+        `[saveResearchResult] Target node ${nodeId} not found in tree ${treeId}. Available IDs: ${tree.goal.idealStates.map((i) => i.id).join(", ")}`,
+      );
+      throw new Error("Target node not found");
+    }
+
+    const result = {
+      createdAt: new Date().toISOString(),
+      id: randomUUID(),
+      keywords,
+      results: [
+        {
+          snippet: summary,
+          title: "Research Summary",
+          url,
+        },
+      ],
+      source: source,
+    };
+
+    ideal.researchResults.push(result);
+    tree.updatedAt = new Date().toISOString();
+
+    transaction.set(treeRef, tree);
+
+    return tree;
+  });
 }
 
 export async function saveResearchSearchResults(
@@ -314,21 +340,47 @@ export async function saveResearchSearchResults(
   keywords: string[],
   results: SearchResultItem[],
 ): Promise<Tree> {
-  const tree = await getTree(userId);
-  const ideal = tree.goal.idealStates.find((i) => i.id === nodeId);
+  console.log(`[saveResearchSearchResults] Starting for User: ${userId}, Node: ${nodeId}`);
 
-  if (!ideal) throw new Error("Target node not found");
+  return await db.runTransaction(async (transaction) => {
+    const userRoot = getUserRoot(userId);
+    const indexRef = userRoot.collection(META_COLLECTION).doc(INDEX_DOC);
+    const indexDoc = await transaction.get(indexRef);
 
-  const result = {
-    createdAt: new Date().toISOString(),
-    id: randomUUID(),
-    keywords,
-    results, // Save the list of results directly
-    source: source as any,
-  };
+    if (!indexDoc.exists) throw new Error("User index not found");
+    const index = indexDoc.data() as TreeIndex;
+    const treeId = index.activeTreeId;
 
-  ideal.researchResults.push(result);
-  await saveTree(userId, tree);
+    if (!treeId) throw new Error("No active tree found");
 
-  return tree;
+    const treeRef = userRoot.collection(TREES_COLLECTION).doc(treeId);
+    const treeDoc = await transaction.get(treeRef);
+
+    if (!treeDoc.exists) throw new Error("Active tree not found");
+
+    const tree = treeDoc.data() as Tree;
+    const ideal = tree.goal.idealStates.find((i) => i.id === nodeId);
+
+    if (!ideal) {
+      console.error(
+        `[saveResearchSearchResults] Target node ${nodeId} not found in tree ${treeId}. Available IDs: ${tree.goal.idealStates.map((i) => i.id).join(", ")}`,
+      );
+      throw new Error("Target node not found");
+    }
+
+    const result = {
+      createdAt: new Date().toISOString(),
+      id: randomUUID(),
+      keywords,
+      results, // Save the list of results directly
+      source: source,
+    };
+
+    ideal.researchResults.push(result);
+    tree.updatedAt = new Date().toISOString();
+
+    transaction.set(treeRef, tree);
+
+    return tree;
+  });
 }

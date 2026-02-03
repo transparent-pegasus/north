@@ -54,21 +54,26 @@ const template = (title, content) => `
 
 // Process files
 try {
-  const files = fs.readdirSync(DOCS_DIR);
+  const files = fs
+    .readdirSync(DOCS_DIR)
+    .filter((file) => path.extname(file) === ".md")
+    .sort((a, b) => b.localeCompare(a)); // Sort descending
 
-  files.forEach((file) => {
-    if (path.extname(file) === ".md") {
-      const filePath = path.join(DOCS_DIR, file);
-      const content = fs.readFileSync(filePath, "utf8");
-      const htmlContent = marked(content);
-      const title = file.replace(".md", "");
+  if (files.length === 0) {
+    console.log("No release notes found.");
+  } else {
+    // Process only the latest file
+    const file = files[0];
+    const filePath = path.join(DOCS_DIR, file);
+    const content = fs.readFileSync(filePath, "utf8");
+    const htmlContent = marked(content);
+    const title = file.replace(".md", "");
 
-      const outputPath = path.join(OUTPUT_DIR, `${title}.html`);
+    const outputPath = path.join(OUTPUT_DIR, `${title}.html`);
 
-      fs.writeFileSync(outputPath, template(title, htmlContent));
-      console.log(`Generated: ${outputPath}`);
-    }
-  });
+    fs.writeFileSync(outputPath, template(title, htmlContent));
+    console.log(`Generated latest release: ${outputPath}`);
+  }
   console.log("Release notes generation complete.");
 } catch (err) {
   console.error("Error generating release notes:", err);

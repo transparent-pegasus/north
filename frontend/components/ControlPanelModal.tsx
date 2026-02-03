@@ -32,7 +32,7 @@ export default function ControlPanelModal({ children, isOpen, onClose }: Control
       />
 
       {/* Drawer Content */}
-      <div className="relative w-full bg-stone-50 dark:bg-stone-900 rounded-t-2xl shadow-2xl p-4 max-h-[85vh] overflow-y-auto pointer-events-auto animate-in slide-in-from-bottom duration-300">
+      <div className="relative w-full bg-stone-50 dark:bg-stone-900 rounded-t-2xl shadow-2xl p-4 max-h-[95dvh] overflow-y-auto pointer-events-auto animate-in slide-in-from-bottom duration-300">
         <div className="flex justify-center mb-4">
           {/* Handle bar */}
           <div className="w-12 h-1.5 bg-stone-300 dark:bg-stone-700 rounded-full" />

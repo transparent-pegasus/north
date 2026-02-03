@@ -248,11 +248,16 @@ function parseResult(result: unknown): DecomposeLoopResult {
   if (Array.isArray(r.existing)) {
     for (const e of r.existing) {
       if (e && typeof e === "object" && "id" in e && "action" in e) {
-        existing.push({
+        const evalItem: ElementEvaluation = {
           action: e.action === "modify" ? "modify" : "keep",
           id: String(e.id),
-          newContent: "newContent" in e ? String(e.newContent) : undefined,
-        });
+        };
+
+        if ("newContent" in e && e.newContent !== null && e.newContent !== undefined) {
+          evalItem.newContent = String(e.newContent);
+        }
+
+        existing.push(evalItem);
       }
     }
   }

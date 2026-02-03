@@ -51,6 +51,10 @@ jest.mock("../ai", () => ({
     ],
     existing: [],
   })),
+  googleApiKey: {
+    value: jest.fn(() => "test-api-key"),
+    name: "GOOGLE_API_KEY",
+  },
 }));
 
 // Mock Research functions

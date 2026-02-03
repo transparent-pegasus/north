@@ -48,6 +48,8 @@ export interface Condition {
 
 // --- Research ---
 
+// --- Research ---
+
 export type SourceType =
   | "openalex"
   | "semantic_scholar"
@@ -84,7 +86,7 @@ export interface ResearchSpec {
 
 export interface ResearchResult {
   id: string;
-  source: SourceType;
+  source: string;
   keywords: string[];
   results: SearchResultItem[];
   createdAt: string;
@@ -96,4 +98,13 @@ export interface SearchResultItem {
   snippet?: string;
   authors?: string[];
   publishedDate?: string;
+}
+
+export interface RefinementData {
+  suggestions: {
+    field: "content" | "condition" | "currentState";
+    value: string;
+    keepReason: string;
+    changeReason: string;
+  }[];
 }

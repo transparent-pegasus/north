@@ -12,7 +12,7 @@ build-local:
 	pnpm --filter @north/backend build && pnpm --filter @north/frontend build:debug
 	@echo "Moving build to out-debug..."
 	-@powershell -Command "if (Test-Path frontend/out-debug) { Remove-Item -Recurse -Force frontend/out-debug }"
-	@powershell -Command "Rename-Item frontend/out -NewName out-debug"
+	@powershell -Command "Start-Sleep -Seconds 3; Rename-Item frontend/out -NewName out-debug"
 
 # Development
 dev: build-local

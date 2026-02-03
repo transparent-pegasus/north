@@ -21,9 +21,15 @@ interface TreeListProps {
   ) => void;
   onRefresh: () => void;
   version: number;
+  processingNodes?: Set<string>;
 }
 
-export default function TreeList({ onNodeSelect, onRefresh, version }: TreeListProps) {
+export default function TreeList({
+  onNodeSelect,
+  onRefresh,
+  version,
+  processingNodes,
+}: TreeListProps) {
   const { showIdealStatePrompt } = useModal();
   const [tree, setTree] = useState<Tree | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -108,6 +114,7 @@ export default function TreeList({ onNodeSelect, onRefresh, version }: TreeListP
           onAdd={handleAddElement}
           onRefresh={onRefresh}
           onDeleteResearch={handleDeleteResearch}
+          processingNodes={processingNodes}
         />
       </div>
     </div>
@@ -131,6 +138,7 @@ interface NodeProps {
   selectedId: string | null;
   onRefresh: () => void;
   onDeleteResearch: (nodeId: string, researchId: string) => void;
+  processingNodes?: Set<string>;
 }
 
 function AddButton({ label, onClick }: { onClick: () => void; label: string }) {
@@ -149,11 +157,13 @@ function AddButton({ label, onClick }: { onClick: () => void; label: string }) {
 
 function GoalNode({ goal, onAdd, ...props }: { goal: Goal } & NodeProps) {
   const isSelected = props.selectedId === goal.id;
+  const isProcessing = props.processingNodes?.has(goal.id);
 
   return (
     <div className="flex flex-col gap-2">
       <button
         onClick={() =>
+          !isProcessing &&
           props.onSelect(
             goal.id,
             "goal",
@@ -163,19 +173,25 @@ function GoalNode({ goal, onAdd, ...props }: { goal: Goal } & NodeProps) {
             goal.pendingProposal,
           )
         }
-        className={`text-left w-full p-4 rounded-lg border transition-all ${
+        disabled={isProcessing}
+        className={`text-left w-full p-4 rounded-lg border transition-all relative ${
           isSelected
             ? "bg-stone-100 dark:bg-stone-800 border-stone-400 dark:border-stone-600"
             : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700"
-        }`}
+        } ${isProcessing ? "opacity-70 cursor-not-allowed" : ""}`}
       >
+        {isProcessing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-stone-950/50 rounded-lg z-10">
+            <div className="w-5 h-5 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
         <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest">
           ゴール
         </span>
         <h2 className="text-base font-medium text-stone-800 dark:text-stone-100 mt-1">
           {goal.content}
         </h2>
-        {goal.pendingProposal && (
+        {goal.pendingProposal && !isProcessing && (
           <div className="flex items-center gap-1 text-[10px] text-amber-500 font-bold mt-1">
             <Sparkles className="w-3 h-3" />
             <span>提案あり</span>
@@ -287,12 +303,14 @@ function ResearchResultItem({ nodeId, onDeleteResearch, onRefresh, res }: Resear
 
 function IdealStateNode({ ideal, ...props }: { ideal: IdealState } & NodeProps) {
   const isSelected = props.selectedId === ideal.id;
+  const isProcessing = props.processingNodes?.has(ideal.id);
   const hasResearch = ideal.researchResults && ideal.researchResults.length > 0;
 
   return (
     <div className="flex flex-col gap-1">
       <button
         onClick={() =>
+          !isProcessing &&
           props.onSelect(
             ideal.id,
             "ideal",
@@ -304,19 +322,25 @@ function IdealStateNode({ ideal, ...props }: { ideal: IdealState } & NodeProps) 
             ideal.currentState?.content,
           )
         }
-        className={`text-left w-full p-3 rounded-lg border transition-all ${
+        disabled={isProcessing}
+        className={`text-left w-full p-3 rounded-lg border transition-all relative ${
           isSelected
             ? "bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-700"
             : "bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-900/30 hover:border-amber-300 dark:hover:border-amber-800"
-        }`}
+        } ${isProcessing ? "opacity-70 cursor-not-allowed" : ""}`}
       >
+        {isProcessing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-stone-950/50 rounded-lg z-10">
+            <div className="w-5 h-5 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
         <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-500 uppercase tracking-widest">
           理想の状態
         </span>
         <p className="text-sm font-medium text-stone-700 dark:text-stone-200 mt-1">
           {ideal.content}
         </p>
-        {ideal.pendingProposal && (
+        {ideal.pendingProposal && !isProcessing && (
           <div className="flex items-center gap-1 text-[10px] text-amber-500 font-bold mt-1">
             <Sparkles className="w-3 h-3" />
             <span>提案あり</span>

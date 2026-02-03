@@ -20,7 +20,7 @@ function getModel() {
   return genAI.getGenerativeModel({ model: geminiModel.value() });
 }
 
-const TIMEOUT_MS = 180000; // 180 seconds
+const TIMEOUT_MS = 300000; // 300 seconds
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   let timeoutHandle: NodeJS.Timeout;

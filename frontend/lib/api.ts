@@ -51,7 +51,7 @@ export async function apiFetch(
   path: string,
   init?: RequestInit & { timeout?: number },
 ): Promise<Response> {
-  const { timeout = 60000, ...fetchInit } = init || {};
+  const { timeout = 300000, ...fetchInit } = init || {};
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
 

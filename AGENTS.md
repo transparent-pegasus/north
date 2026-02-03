@@ -4,13 +4,9 @@
 - 目的: ゴール達成のための「ツリー」分解・リサーチアプリケーション「north」の構築。
 - 行動指針:
   - 仕様の遵守: `AGENTS.md` に記載された仕様（データ構造、ルール）を正として行動する。
-  - ドキュメントファースト: 実装の前に設計（`AGENTS.md`）を更新し、整合性を保つ。
   - KISS原則: 必要以上に複雑な構成を避け、シンプルさを維持する。
   - リリースノート: `docs/releases/` 配下に `YYYYMMDD_M.m.md` (例: `20260202_1.0.md`) の形式で作成する。
   - 既知の問題: `docs/known_issues/` 配下に `YYYYMMDDHHMMSS_簡潔な問題名.md` (例: `20260201170000_firestore_connection_issue.md`) の形式で作成・管理する。
-  - 品質管理: プロジェクト作成時に指定が無い限り、実装サイクルの最後に以下を実行する。
-    - Verification Loop: `make verify` を実行し、Linter によるチェック・修正、および `make build-local` によるビルド検証をパスすることを確認する。
-    - Log Cleanup: `make verify` コマンド内の処理に従い、検証完了後に `.tmp/` 内が空であることを確認する。
 
 # [0] プロジェクト概要
 
@@ -35,8 +31,14 @@
 ```typescript
 // --- Tree Structure ---
 
+interface TreeIndex {
+  trees: { id: string; name: string; updatedAt: string }[];
+  activeTreeId: string;
+}
+
 interface Tree {
   id: string;
+  name: string;
   goal: Goal;
   createdAt: string;
   updatedAt: string;
@@ -98,7 +100,7 @@ interface ResearchSpec {
 
 interface ResearchResult {
   id: string;
-  source: SourceType;
+  source: string; // "manual" or SourceType content
   keywords: string[];
   results: SearchResultItem[];
   createdAt: string;
@@ -119,7 +121,9 @@ interface SearchResultItem {
 
 - ゴールを頂点とするグラフとして描画。
 - 各ノード（要素）はインタラクティブに編集・詳細表示可能。
-- モバイル対応: 狭い画面では下部ツールバーとモーダルによる操作を提供。
+- モバイル対応:
+  - 画面下部に「固定ナビゲーションバー」(Bottom Navigation) を配置し、ツリーの切り替え、新規作成、削除などの主要な操作を集約。
+  - ノード詳細はモーダル（下部からのドロワー）による操作を提供。
 
 ## 2. 要素分解・再構成
 
@@ -137,6 +141,9 @@ interface SearchResultItem {
   - `Puppeteer` および各種API (OpenAlex, Semantic Scholar, ArXiv, PubMed, Wikipedia) を使用してWebから情報取得。
   - 検索結果（タイトル、URL、スニペット）を候補リストとして保存・提示する。
   - 保存されたリサーチ結果は、分解および洗練プロセスのAIプロンプトに含まれ、より具体的な提案の生成に利用される。
+- 手動追加:
+  - ユーザーが独自のソース（URL、タイトル、メモ）を直接入力してリサーチ結果として保存できる機能。
+  - 手動追加時の `source` は "manual" として記録される。
 
 ## 4. 認証・管理
 
@@ -146,6 +153,9 @@ interface SearchResultItem {
   - ※Productionビルドでは匿名ログインを非表示とし、Googleログインを必須とする。
 - 認証基盤:
   - Firebase Authを使用。すべてのAPIリクエストでIDトークンの検証を行う。
+- 環境設定 (CI/CD):
+  - GitHub Actions を使用してデプロイ。
+  - FirebaseのAPIキーなどのクライアントサイド設定は、GitHub Secrets経由でビルド時に注入する。
 - 利用制限 (Rate Limiting):
   - Free Plan制限として、以下のAI機能に1日あたりの回数制限を設ける。
     - 分解 (Decompose): 3回/日
@@ -170,12 +180,31 @@ interface SearchResultItem {
 
 # [5] ルール
 
-- コード変更時は必ず本ドキュメント `AGENTS.md` を更新する。
 - パッケージ管理には必ず `pnpm` を使用する。`npm` や `yarn` によるインストールは厳禁とする。
-- リサーチ結果は `[適切なパス]/[ソース名]/[タイトル].md` に保存する。
-- 一連の作業（タスク）完了ごとに必ずBiomeによるフォーマットを実行する (`pnpm run format`)。
 
-# [6] リリース・エンジニアリング
+# [6] 開発サイクル
+
+以下のフローに従って開発を進めること。
+
+1. **計画策定 (Planning)**
+   - プロンプトの最初に `[実装計画]` がある場合のみ、実装計画を策定する。
+   - `docs/plans/` 配下に `N_計画名.md` (Nは連番) の形式で保存する。
+
+2. **ドキュメント更新 (Documentation)**
+   - **ドキュメントファースト**: 実装の前に設計（`AGENTS.md`）を更新し、整合性を保つ。
+   - コード変更が生じる場合、必ず本ドキュメント `AGENTS.md` の該当箇所（データ構造、機能要件など）を先に更新する。
+
+3. **実装 (Implementation)**
+   - KISS原則に従い、シンプルに実装する。
+
+4. **品質管理・検証 (Verification)**
+   - 実装サイクルの最後に、以下のコマンドを実行して品質を検証する。これを通過しないコードは完了とみなさない。
+     - **Verification Loop**: `make verify`
+       - Linter (Biome) によるチェックと自動修正が行われる。
+       - `make build-local` が実行され、ビルドエラーがないか確認される。
+     - **Log Cleanup**: `make verify` によって `.tmp/` 内がクリーンアップされたことを確認する。
+
+# [7] リリース・エンジニアリング
 
 ## 1. Web Deployment (Firebase)
 
@@ -194,13 +223,14 @@ interface SearchResultItem {
   - `android-keystore.jks` が生成されるため、安全に管理する。
   - `twa-manifest.json` 内の署名設定を参照。
 
-# [7] ディレクトリ構造
+# [8] ディレクトリ構造
 
 - frontend: Next.js application
   - app: App Router root
   - components: UI Components
+  - types: TypeScript definitions
   - public: Static assets (icons, manifest.json)
 - backend: Firebase Functions
   - src: Backend logic (Express app, tree operations, AI)
-- types: Shared TypeScript definitions
+  - src/types.ts: Backend TypeScript definitions
 - research: Markdown research outputs

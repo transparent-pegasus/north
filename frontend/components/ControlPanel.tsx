@@ -8,11 +8,7 @@ import RefineProposalModal from "@/components/RefineProposalModal";
 import ResearchModal from "@/components/ResearchModal";
 import { apiFetch } from "@/lib/api";
 
-interface RefinementSuggestion {
-  keepReason: string;
-  changeReason: string;
-  newContent: string;
-}
+import type { RefinementData } from "@/types";
 
 interface DecompositionProposal {
   additions: { condition: string; current: string; ideal: string }[];
@@ -31,12 +27,16 @@ interface ControlPanelProps {
     type: "goal" | "ideal";
   } | null;
   setGlobalLoading: (loading: boolean | string) => void;
+  onProcessingStart: (id: string) => void;
+  onProcessingEnd: (id: string) => void;
 }
 
 export default function ControlPanel({
   onDecompose,
   selectedNode,
   setGlobalLoading,
+  onProcessingStart,
+  onProcessingEnd,
 }: ControlPanelProps) {
   const { showConfirm, showError } = useModal();
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ export default function ControlPanel({
   const [currentStateInput, setCurrentStateInput] = useState("");
   const [refineInstruction, setRefineInstruction] = useState("");
   const [maxItems, setMaxItems] = useState(5);
-  const [suggestion, setSuggestion] = useState<RefinementSuggestion | null>(null);
+  const [suggestion, setSuggestion] = useState<RefinementData | null>(null);
   const [decomposeProposal, setDecomposeProposal] = useState<DecompositionProposal | null>(null);
   const [selectedAdditionIndices, setSelectedAdditionIndices] = useState<Set<number>>(new Set());
   const [selectedModificationIds, setSelectedModificationIds] = useState<Set<string>>(new Set());
@@ -53,7 +53,11 @@ export default function ControlPanel({
   const [isRefineModalOpen, setIsRefineModalOpen] = useState(false);
   const [usage, setUsage] = useState({ decompose: 0, refine: 0, research: 0 });
 
-  const LIMITS = { decompose: 3, refine: 3, research: 3 };
+  const LIMITS = {
+    decompose: Number(process.env.NEXT_PUBLIC_LIMIT_DECOMPOSE) || 3,
+    refine: Number(process.env.NEXT_PUBLIC_LIMIT_REFINE) || 3,
+    research: Number(process.env.NEXT_PUBLIC_LIMIT_RESEARCH) || 3,
+  };
 
   const fetchUsage = useCallback(async () => {
     try {
@@ -113,7 +117,7 @@ export default function ControlPanel({
       } else if (proposal.type === "refinement") {
         const data = proposal.data;
 
-        if (data?.newContent) {
+        if (data?.suggestions || data?.refinedIdealState) {
           setSuggestion(data);
           // Don't auto-open modal to avoid annoying popups on navigation,
           // but we could. User asked to "restore".
@@ -196,20 +200,36 @@ export default function ControlPanel({
     }
   };
 
-  const handleDecompose = () =>
-    withLoading(async () => {
-      if (!selectedNode) return;
-      setGlobalLoading("Decomposing");
+  const handleDecompose = async () => {
+    if (!selectedNode) return;
+
+    // Start background processing
+    const nodeId = selectedNode.id;
+    const currentNodeType = selectedNode.type;
+    const currentMaxItems = maxItems;
+    onProcessingStart(nodeId);
+
+    // Show dismissible message (Wait, we rely on Parent to make it dismissible or non-blocking)
+    // We pass a special string "Decomposing:BACKGROUND" or similar if we want special handling?
+    // Or just "Decomposing" and let parent handle it.
+    // NOTE: setGlobalLoading("Decomposing") creates the overlay.
+    // We want to make it dismissible.
+    setGlobalLoading("Decomposing");
+
+    try {
+      // Don't await in a way that blocks this function if we want to return?
+      // No, we want to execute the request.
       const res = await apiFetch("/api/decompose", {
         body: JSON.stringify({
-          id: selectedNode.id,
-          maxItems,
-          type: selectedNode.type,
+          id: nodeId,
+          maxItems: currentMaxItems,
+          type: currentNodeType,
         }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
         timeout: 120000,
       });
+
       const data = await res.json();
 
       console.log("DEBUG: Received Decompose Proposal:", data);
@@ -217,25 +237,39 @@ export default function ControlPanel({
       if (!res.ok) {
         console.error("Decomposition failed:", data);
         await handleError(data, "分解に失敗しました");
-
         return;
       }
 
-      if (data && Array.isArray(data.existing) && Array.isArray(data.additions)) {
-        setDecomposeProposal(data);
-        // Default select all
-        setSelectedAdditionIndices(new Set((data.additions || []).map((_: any, i: number) => i)));
-        setSelectedModificationIds(
-          new Set(
-            (data.existing || []).filter((e: any) => e.action === "modify").map((e: any) => e.id),
-          ),
-        );
-        fetchUsage();
-      } else {
-        console.warn("Invalid decomposition data:", data);
-        await showError("有効な提案を受け取れませんでした。もう一度試してください。");
+      // If we are still looking at the same node, update UI.
+      if (selectedNode && selectedNode.id === nodeId) {
+        if (data && Array.isArray(data.existing) && Array.isArray(data.additions)) {
+          setDecomposeProposal(data);
+          // Default select all
+          setSelectedAdditionIndices(new Set((data.additions || []).map((_: any, i: number) => i)));
+          setSelectedModificationIds(
+            new Set(
+              (data.existing || []).filter((e: any) => e.action === "modify").map((e: any) => e.id),
+            ),
+          );
+          fetchUsage();
+        } else {
+          console.warn("Invalid decomposition data:", data);
+          await showError("有効な提案を受け取れませんでした。もう一度試してください。");
+        }
       }
-    });
+      // Regardless, refresh tree (to update node status if needed or to ensure consistency)
+      onDecompose(true);
+    } catch (e) {
+      console.error(e);
+      await showError("分解処理中にエラーが発生しました。");
+    } finally {
+      // Clean up
+      onProcessingEnd(nodeId);
+      // We don't unset global loading here if we rely on the dismiss button?
+      // Actually we MUST unset it if it's still open.
+      setGlobalLoading(false);
+    }
+  };
 
   const handleApplyDecomposition = () =>
     withLoading(async () => {
@@ -272,13 +306,17 @@ export default function ControlPanel({
       }
     });
 
-  const handleSuggestRefine = () =>
-    withLoading(async () => {
-      if (!selectedNode || !refineInstruction) return;
-      setGlobalLoading("Refining");
+  const handleSuggestRefine = async () => {
+    if (!selectedNode || !refineInstruction) return;
+
+    const nodeId = selectedNode.id;
+    onProcessingStart(nodeId);
+    setGlobalLoading("Refining");
+
+    try {
       const res = await apiFetch("/api/suggest-refine", {
         body: JSON.stringify({
-          id: selectedNode.id,
+          id: nodeId,
           instruction: refineInstruction,
           type: selectedNode.type,
         }),
@@ -292,29 +330,46 @@ export default function ControlPanel({
 
       if (!res.ok) {
         await handleError(data, "提案の取得に失敗しました");
-
         return;
       }
 
-      if (!data || (!data.newContent && !data.keepReason)) {
+      if (!data || (!data.suggestions && !data.refinedIdealState)) {
         await showError("有効な提案を受け取れませんでした。AIの出力を確認してください。");
-
         return;
       }
 
       setSuggestion(data);
       setIsRefineModalOpen(true);
       fetchUsage();
-    });
+    } catch (e) {
+      console.error(e);
+      await showError("提案処理中にエラーが発生しました。");
+    } finally {
+      onProcessingEnd(nodeId);
+      setGlobalLoading(false);
+    }
+  };
 
   const handleApplyRefine = () =>
     withLoading(async () => {
       if (!selectedNode || !suggestion) return;
       setGlobalLoading("Applying");
+
+      const updates: any = {};
+      if (suggestion.refinedIdealState !== undefined) {
+        updates.content = suggestion.refinedIdealState;
+        updates.currentState = suggestion.refinedCurrentState;
+        updates.condition = suggestion.refinedCondition;
+      } else if (suggestion.suggestions) {
+        suggestion.suggestions.forEach((s) => {
+          updates[s.field] = s.value;
+        });
+      }
+
       const res = await apiFetch("/api/apply-refine", {
         body: JSON.stringify({
           id: selectedNode.id,
-          newContent: suggestion.newContent,
+          newContent: updates,
           type: selectedNode.type,
         }),
         headers: { "Content-Type": "application/json" },
@@ -350,12 +405,12 @@ export default function ControlPanel({
     "p-3 bg-white dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800";
 
   return (
-    <div className="flex flex-col gap-3 overflow-y-auto max-h-full">
+    <div className="flex flex-col gap-3">
       {/* Primary Card: Element Edit */}
       <div className={cardClass}>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest">
-            {typeLabels[selectedNode.type]}
+            要素の編集
           </span>
         </div>
         <div className="space-y-4">
@@ -701,7 +756,7 @@ export default function ControlPanel({
         nodeId={selectedNode.id}
         initialSpec={selectedNode.researchSpec}
         onResearchComplete={() => {
-          onDecompose(true);
+          onDecompose(false);
           setIsResearchModalOpen(false);
           fetchUsage();
         }}
@@ -714,6 +769,8 @@ export default function ControlPanel({
         onApply={handleApplyRefine}
         currentContent={selectedNode.label || ""}
         suggestion={suggestion}
+        currentCondition={selectedNode.condition}
+        currentCurrentState={selectedNode.currentState}
       />
     </div>
   );
