@@ -1,0 +1,360 @@
+"use client";
+
+import { Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useModal } from "@/components/ModalProvider";
+import { apiFetch } from "@/lib/api";
+import type { Goal, IdealState, Tree } from "@/types";
+
+interface TreeListProps {
+  onNodeSelect: (
+    node: {
+      childCount?: number;
+      condition?: string;
+      currentState?: string;
+      id: string;
+      label?: string;
+      pendingProposal?: any;
+      researchSpec?: any;
+      type: "goal" | "ideal";
+    } | null,
+  ) => void;
+  onRefresh: () => void;
+  version: number;
+}
+
+export default function TreeList({ onNodeSelect, onRefresh, version }: TreeListProps) {
+  const { showIdealStatePrompt } = useModal();
+  const [tree, setTree] = useState<Tree | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log(`[TreeList] Fetching tree data (v${version})`);
+    apiFetch("/api/tree")
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText);
+
+        return res.json();
+      })
+      .then(setTree)
+      .catch((e) => {
+        console.error(e);
+        setTree(null);
+      });
+  }, [version]);
+
+  const handleSelect = (
+    id: string,
+    type: "goal" | "ideal",
+    label?: string,
+    researchSpec?: any,
+    childCount?: number,
+    pendingProposal?: any,
+    condition?: string,
+    currentState?: string,
+  ) => {
+    setSelectedId(id);
+    onNodeSelect({
+      childCount,
+      condition,
+      currentState,
+      id,
+      label,
+      pendingProposal,
+      researchSpec,
+      type,
+    });
+  };
+
+  const handleAddElement = async (parentId: string) => {
+    const data = await showIdealStatePrompt();
+
+    if (!data) return;
+
+    await apiFetch("/api/add-element", {
+      body: JSON.stringify({ ...data, parentId }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    onRefresh();
+  };
+
+  const handleDeleteResearch = (nodeId: string, researchId: string) => {
+    if (!tree) return;
+    const newIdeals = tree.goal.idealStates.map((ideal) => {
+      if (ideal.id !== nodeId) return ideal;
+
+      return {
+        ...ideal,
+        researchResults: ideal.researchResults.filter((r) => r.id !== researchId),
+      };
+    });
+
+    setTree({
+      ...tree,
+      goal: { ...tree.goal, idealStates: newIdeals },
+    });
+  };
+
+  if (!tree) return <div className="p-4 text-center text-stone-400 text-sm">読み込み中...</div>;
+
+  return (
+    <div className="w-full h-full overflow-y-auto p-4">
+      <div className="max-w-2xl mx-auto flex flex-col gap-3 pb-20">
+        <GoalNode
+          goal={tree.goal}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          onAdd={handleAddElement}
+          onRefresh={onRefresh}
+          onDeleteResearch={handleDeleteResearch}
+        />
+      </div>
+    </div>
+  );
+}
+
+// --- Components ---
+
+interface NodeProps {
+  onAdd: (parentId: string) => void;
+  onSelect: (
+    id: string,
+    type: "goal" | "ideal",
+    label?: string,
+    researchSpec?: any,
+    childCount?: number,
+    pendingProposal?: any,
+    condition?: string,
+    currentState?: string,
+  ) => void;
+  selectedId: string | null;
+  onRefresh: () => void;
+  onDeleteResearch: (nodeId: string, researchId: string) => void;
+}
+
+function AddButton({ label, onClick }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="w-full py-1.5 text-[10px] font-medium text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 rounded border border-dashed border-stone-200 dark:border-stone-700 transition-all tracking-wide"
+    >
+      + {label}
+    </button>
+  );
+}
+
+function GoalNode({ goal, onAdd, ...props }: { goal: Goal } & NodeProps) {
+  const isSelected = props.selectedId === goal.id;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={() =>
+          props.onSelect(
+            goal.id,
+            "goal",
+            goal.content,
+            undefined,
+            goal.idealStates.length,
+            goal.pendingProposal,
+          )
+        }
+        className={`text-left w-full p-4 rounded-lg border transition-all ${
+          isSelected
+            ? "bg-stone-100 dark:bg-stone-800 border-stone-400 dark:border-stone-600"
+            : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700"
+        }`}
+      >
+        <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest">
+          ゴール
+        </span>
+        <h2 className="text-base font-medium text-stone-800 dark:text-stone-100 mt-1">
+          {goal.content}
+        </h2>
+        {goal.pendingProposal && (
+          <div className="flex items-center gap-1 text-[10px] text-amber-500 font-bold mt-1">
+            <Sparkles className="w-3 h-3" />
+            <span>提案あり</span>
+          </div>
+        )}
+      </button>
+
+      {/* Ideal States */}
+      <div className="flex flex-col gap-4 pl-4 ml-2 border-l border-dashed border-stone-200 dark:border-stone-800">
+        <AddButton onClick={() => onAdd(goal.id)} label="理想の状態を追加" />
+        {goal.idealStates.map((ideal) => (
+          <IdealStateNode key={ideal.id} ideal={ideal} onAdd={onAdd} {...props} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface ResearchResultItemProps {
+  res: IdealState["researchResults"][0];
+  nodeId: string;
+  onRefresh: () => void;
+  onDeleteResearch: (nodeId: string, researchId: string) => void;
+}
+
+function ResearchResultItem({ nodeId, onDeleteResearch, onRefresh, res }: ResearchResultItemProps) {
+  const [expanded, setExpanded] = useState(false);
+  const { showConfirm, showError } = useModal();
+  const displayResults = expanded ? res.results : res.results.slice(0, 3);
+  const hasMore = res.results.length > 3;
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = await showConfirm("このリサーチ結果を削除しますか？");
+
+    if (!ok) return;
+
+    try {
+      // Optimistic Update
+      onDeleteResearch(nodeId, res.id);
+
+      const resp = await apiFetch("/research", {
+        body: JSON.stringify({ nodeId, researchId: res.id }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      });
+
+      if (!resp.ok) {
+        throw new Error("Failed to delete");
+      }
+      // No need to refresh entire tree if successful, as local state is already updated.
+      // But we call onRefresh to sync eventual consistency or side effects if any.
+      // However, to keep UI snappy, maybe skip it or do it silently?
+      // User asked to eliminate lag. The lag is from waiting for API then Refresh.
+      // We already updated UI. Refreshing now might just re-render same thing.
+      // Better to just let it be, or refresh silently without loading state (but TreeList uses apiFetch which doesn't trigger global loading, just local setTree).
+      // Let's Skip explicit refresh for better UX, or do it?
+      // If we skip, we rely 100% on local logic matching server.
+      // Let's skip to maximize speed perception, unless error.
+    } catch (err) {
+      console.error(err);
+      showError("削除に失敗しました");
+      onRefresh(); // Revert/Sync on error
+    }
+  };
+
+  return (
+    <div className="text-xs group relative pr-6">
+      <div className="text-blue-500 font-medium mb-0.5 flex items-center justify-between">
+        <span>
+          {res.source} ({res.results.length}件)
+        </span>
+      </div>
+
+      <button
+        onClick={handleDelete}
+        className="absolute top-0 right-0 text-stone-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="リサーチ結果を削除"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+
+      {displayResults.map((item) => (
+        <a
+          key={item.url}
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-stone-600 dark:text-stone-400 hover:text-blue-600 dark:hover:text-blue-400 truncate"
+          onClick={(e) => e.stopPropagation()}
+        >
+          • {item.title}
+        </a>
+      ))}
+      {hasMore && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(!expanded);
+          }}
+          className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400"
+        >
+          {expanded ? "▲ 折りたたむ" : `▼ 他${res.results.length - 3}件を表示`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function IdealStateNode({ ideal, ...props }: { ideal: IdealState } & NodeProps) {
+  const isSelected = props.selectedId === ideal.id;
+  const hasResearch = ideal.researchResults && ideal.researchResults.length > 0;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        onClick={() =>
+          props.onSelect(
+            ideal.id,
+            "ideal",
+            ideal.content,
+            ideal.researchSpec,
+            undefined,
+            ideal.pendingProposal,
+            ideal.condition?.content,
+            ideal.currentState?.content,
+          )
+        }
+        className={`text-left w-full p-3 rounded-lg border transition-all ${
+          isSelected
+            ? "bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-700"
+            : "bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-900/30 hover:border-amber-300 dark:hover:border-amber-800"
+        }`}
+      >
+        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-500 uppercase tracking-widest">
+          理想の状態
+        </span>
+        <p className="text-sm font-medium text-stone-700 dark:text-stone-200 mt-1">
+          {ideal.content}
+        </p>
+        {ideal.pendingProposal && (
+          <div className="flex items-center gap-1 text-[10px] text-amber-500 font-bold mt-1">
+            <Sparkles className="w-3 h-3" />
+            <span>提案あり</span>
+          </div>
+        )}
+
+        {(ideal.currentState || ideal.condition) && (
+          <div className="mt-2 pt-2 border-t border-amber-200/50 dark:border-amber-800/30 text-xs text-stone-500 dark:text-stone-400 space-y-0.5">
+            {ideal.currentState && <div>現状: {ideal.currentState.content}</div>}
+            {ideal.condition && <div>条件: {ideal.condition.content}</div>}
+          </div>
+        )}
+
+        {/* Research Spec */}
+        {ideal.researchSpec && (
+          <div className="mt-2 pt-2 border-t border-amber-200/50 dark:border-amber-800/30 text-xs">
+            <span className="text-blue-600 dark:text-blue-400 font-medium">
+              📚 {ideal.researchSpec.source}
+            </span>
+            <span className="text-stone-400 ml-2">[{ideal.researchSpec.keywords.join(", ")}]</span>
+          </div>
+        )}
+      </button>
+
+      {/* Research Results */}
+      {hasResearch && (
+        <div className="ml-4 pl-3 border-l-2 border-blue-200 dark:border-blue-800 space-y-1">
+          {ideal.researchResults.map((res) => (
+            <ResearchResultItem
+              key={res.id}
+              res={res}
+              nodeId={ideal.id}
+              onRefresh={props.onRefresh}
+              onDeleteResearch={props.onDeleteResearch}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

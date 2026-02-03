@@ -1,0 +1,29 @@
+{
+  "name": "north",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm build:backend && concurrently -k --names \"EMULATORS,FRONTEND\" -c \"blue,magenta\" \"npx firebase emulators:start --only functions,firestore,auth\" \"pnpm --filter @north/frontend dev\"",
+    "build": "pnpm --filter @north/backend build && pnpm --filter @north/frontend build",
+    "build:backend": "pnpm --filter @north/backend build",
+    "generate:releases": "node scripts/generate-releases.js",
+    "format": "biome format --write .",
+    "lint": "pnpm lint:biome && pnpm lint:eslint",
+    "lint:biome": "biome lint .",
+    "lint:eslint": "eslint ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.13",
+    "@eslint/eslintrc": "^3.3.3",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "16.1.6",
+    "eslint-plugin-perfectionist": "^5.4.0",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "firebase-tools": "^15.5.1",
+    "marked": "^17.0.1",
+    "typescript-eslint": "^8.54.0"
+  }
+}

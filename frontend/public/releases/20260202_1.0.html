@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>20260202_1.0</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      background-color: #f9fafb;
+    }
+    .container {
+      background-color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #eaeaea; padding-bottom: 0.5rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #eaeaea; padding-bottom: 0.3rem; }
+    ul { padding-left: 1.5rem; }
+    code { background-color: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>North v1.0 - Initial Release</h1>
+<p>記念すべき最初のリリースです。「North」は、ユーザーが設定した「ゴール」を達成可能な「理想の状態」や「条件」に要素分解し、必要な情報をリサーチして可視化するアプリケーションです。</p>
+<h2>主な機能</h2>
+<h3>1. ゴール分解ツリー (Tree Visualization)</h3>
+<ul>
+<li>ツリー構造の可視化: ゴールを頂点とし、それを達成するための「理想の状態」をツリー状に展開して表示します。</li>
+<li>インタラクティブな編集: ノードを追加・編集・削除し、思考を整理できます。</li>
+</ul>
+<h3>2. AIによる思考支援 (AI Assistance)</h3>
+<ul>
+<li>要素分解 (Decompose): ゴールを、AIが自動的に具体的な「理想の状態」へと要素分解します（※「理想の状態」は分解の対象外です）。</li>
+<li>洗練 (Refine): 「もっと具体的に」「別の視点で」といった指示をAIに送ることで、内容をブラッシュアップできます。</li>
+<li>熟考プロセス: AIが思考サイクルを回し、より解像度の高い提案を行います。</li>
+</ul>
+<h3>3. リサーチ機能 (Research Assistant)</h3>
+<ul>
+<li>多角的な情報収集: OpenAlex, Semantic Scholar, ArXiv, PubMed, Wikipedia のAPIおよび一般Web検索を統合し、信頼性の高い情報を取得します。</li>
+<li>候補の保存: キーワード検索から得られた複数の候補（タイトル、URL、スニペット）を「リサーチ結果」として保存し、いつでも参照可能にします。</li>
+<li>インテリジェントな活用: 保存されたリサーチ結果は「要素分解」や「洗練」の際にAIに参照され、具体的かつ根拠のある提案生成をサポートします。</li>
+</ul>
+<blockquote>
+<p>[!NOTE]
+現在、リサーチ機能は試験的な実装（ベータ版）のため、検索ソースによっては動作が不安定な場合があります。</p>
+</blockquote>
+<h3>4. アカウント管理と利用制限</h3>
+<ul>
+<li>Google ログイン: Googleアカウントを使用してデータをクラウドに安全に保存します。</li>
+<li>無料版の利用制限: 要素分解・洗練・リサーチのAI機能は、それぞれ1日3回までご利用いただけます。<ul>
+<li><em>理由</em>: 高度なAIモデルを持続的に無償提供するため、リクエスト数に上限を設けさせていただいております。</li>
+</ul>
+</li>
+</ul>
+<h3>5. マルチプラットフォーム対応</h3>
+<ul>
+<li>PWA対応: モバイル・デスクトップの両方に対応し、アプリのような使い心地を提供します。</li>
+</ul>
+<h2>今後の展望</h2>
+<ul>
+<li>Android版アプリの提供: TWA（Trusted Web Activity）技術を用いたストアアプリ版の開発。</li>
+<li>機能拡張: ユーザーフィードバックに基づいた制限の緩和や、新機能の追加。</li>
+</ul>
+
+  </div>
+</body>
+</html>

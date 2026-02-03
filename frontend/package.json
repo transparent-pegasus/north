@@ -1,0 +1,35 @@
+{
+  "name": "@north/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:debug": "cross-env NEXT_PUBLIC_SHOW_DEBUG=true next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "@heroui/react": "^2.8.8",
+    "firebase": "^12.8.0",
+    "framer-motion": "^12.29.2",
+    "lucide-react": "^0.563.0",
+    "next": "16.1.6",
+    "next-themes": "^0.4.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@heroui/theme": "^2.4.26",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^25.2.0",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.24",
+    "cross-env": "^10.1.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3"
+  }
+}

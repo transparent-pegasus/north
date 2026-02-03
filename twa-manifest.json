@@ -1,0 +1,40 @@
+{
+  "packageId": "com.transparent_pegasus.north",
+  "name": "North",
+  "launcherName": "North",
+  "startUrl": "/",
+  "display": "standalone",
+  "themeColor": "#FFFFFF",
+  "navigationColor": "#FFFFFF",
+  "backgroundColor": "#FFFFFF",
+  "host": "north-c409d.web.app",
+  "enableNotifications": true,
+  "features": {
+    "playBilling": {
+      "enabled": false
+    },
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playCore": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "chromeosBoardSupport": {
+    "enabled": false
+  },
+  "fallbackType": "customtabs",
+  "webManifestUrl": "https://north-c409d.web.app/manifest.json",
+  "iconUrl": "https://north-c409d.web.app/icon-512.png",
+  "maskableIconUrl": "https://north-c409d.web.app/icon-maskable-512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "signingKey": {
+    "path": "./android-keystore.jks",
+    "alias": "android"
+  },
+  "generatorApp": "bubblewrap-cli"
+}

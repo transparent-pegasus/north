@@ -1,0 +1,50 @@
+# Deploy to Firebase Hosting on PR (preview)
+
+name: Deploy to Firebase Hosting on PR
+on: pull_request
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+env:
+  NEXT_PUBLIC_API_URL: https://asia-northeast1-north-c409d.cloudfunctions.net/api
+
+jobs:
+  build_and_preview:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Lint and Format Check
+        run: pnpm biome check .
+
+      - name: Test Backend
+        run: pnpm --filter @north/backend test
+
+      - name: Generate Releases
+        run: pnpm run generate:releases
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Deploy to Firebase Hosting (Preview)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_NORTH_C409D }}
+          projectId: north-c409d
