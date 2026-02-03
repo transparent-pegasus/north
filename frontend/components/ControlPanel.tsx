@@ -396,11 +396,6 @@ export default function ControlPanel({
     );
   }
 
-  const typeLabels: Record<string, string> = {
-    goal: "ゴール",
-    ideal: "理想の状態",
-  };
-
   const cardClass =
     "p-3 bg-white dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800";
 
