@@ -31,7 +31,7 @@ export const config = {
   // These values are public and safe to be exposed in the client bundle.
   firebase: {
     apiKey: "AIzaSyBzRQyIn6Hoa8KqEb8NVgebjO_FwIPk-ug",
-    authDomain: "north-c409d.web.app",
+    authDomain: "north-c409d.firebaseapp.com",
     projectId: "north-c409d",
     storageBucket: "north-c409d.firebasestorage.app",
     messagingSenderId: "895054828509",
