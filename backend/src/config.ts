@@ -12,9 +12,10 @@ export const config = {
 
   // Feature Rate Limits (Daily)
   limits: {
-    decompose: 100,
-    refine: 100,
-    research: 100,
+    decompose: process.env.LIMIT_DECOMPOSE ? Number(process.env.LIMIT_DECOMPOSE) : 3,
+    refine: process.env.LIMIT_REFINE ? Number(process.env.LIMIT_REFINE) : 3,
+    research: process.env.LIMIT_RESEARCH ? Number(process.env.LIMIT_RESEARCH) : 3,
+    maxTrees: process.env.LIMIT_MAX_TREES ? Number(process.env.LIMIT_MAX_TREES) : 10,
   },
 
   // Google Cloud Options

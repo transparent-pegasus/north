@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import type { IdealState, SearchResultItem, Tree, TreeIndex } from "./types";
+import type { Goal, IdealState, Tree, TreeIndex } from "./types";
 
 import "./setup";
 
@@ -57,15 +57,23 @@ async function saveIndex(userId: string, index: TreeIndex): Promise<void> {
 // --- Tree CRUD ---
 
 export async function listTrees(userId: string): Promise<TreeIndex> {
-  return getIndex(userId);
+  const index = await getIndex(userId);
+
+  // If no active tree is set but trees exist, set the first one as active
+  if (!index.activeTreeId && index.trees.length > 0) {
+    index.activeTreeId = index.trees[0].id;
+    await saveIndex(userId, index);
+  }
+
+  return index;
 }
 
-export async function getTree(userId: string, id?: string): Promise<Tree> {
+export async function getTree(userId: string, id?: string): Promise<Tree | null> {
   const index = await getIndex(userId);
   const targetId = id || index.activeTreeId;
 
   if (!targetId) {
-    return createTree(userId, "新しいゴール");
+    return null;
   }
 
   const doc = await getUserRoot(userId).collection(TREES_COLLECTION).doc(targetId).get();
@@ -74,7 +82,7 @@ export async function getTree(userId: string, id?: string): Promise<Tree> {
     return doc.data() as Tree;
   }
 
-  return createTree(userId, "新しいゴール");
+  return null;
 }
 
 export async function saveTree(userId: string, tree: Tree): Promise<void> {
@@ -147,6 +155,7 @@ export async function setActiveTree(userId: string, id: string): Promise<TreeInd
 
 export async function updateGoal(userId: string, content: string): Promise<Tree> {
   const tree = await getTree(userId);
+  if (!tree) throw new Error("Tree not found");
 
   tree.goal.content = content;
   tree.name = content;
@@ -164,27 +173,14 @@ export async function promoteIdealToGoal(
 
   if (!parentTree) throw new Error("Parent tree not found");
 
-  // Find the ideal state
   const ideal = parentTree.goal.idealStates.find((i) => i.id === idealId);
 
   if (!ideal) throw new Error("Ideal state not found");
 
-  // Create new tree
   const newTree = await createTree(userId, ideal.content);
 
-  // Update parent tree linking?
-  // Ideally we link them. For now, just creating it is the first step.
-  // We should maybe mark the ideal state as "promoted" or link to new tree.
-  // extending IdealState with linkToTreeId is good.
-
-  // ideal.linkToTreeId = newTree.id; // Type update needed
-  // await saveTree(parentTree);
-
-  // For this tasks scope, we just create the tree and return its ID.
   return newTree.id;
 }
-
-// --- Element Operations ---
 
 export async function addElement(
   userId: string,
@@ -195,6 +191,7 @@ export async function addElement(
   currentStateContent: string,
 ): Promise<Tree> {
   const tree = await getTree(userId);
+  if (!tree) throw new Error("Tree not found");
 
   if (parentType === "goal") {
     const newIdeal: IdealState = {
@@ -229,6 +226,7 @@ export async function updateElement(
   currentState?: string,
 ): Promise<Tree> {
   const tree = await getTree(userId);
+  if (!tree) throw new Error("Tree not found");
 
   if (type === "goal") {
     tree.goal.content = content;
@@ -264,13 +262,13 @@ export async function updateElement(
 
 export async function deleteElement(userId: string, id: string, type: "ideal"): Promise<Tree> {
   const tree = await getTree(userId);
+  if (!tree) throw new Error("Tree not found");
 
   if (type === "ideal") {
     tree.goal.idealStates = tree.goal.idealStates.filter((i) => i.id !== id);
   }
 
   await saveTree(userId, tree);
-
   return tree;
 }
 
@@ -282,8 +280,6 @@ export async function saveResearchResult(
   summary: string,
   url: string,
 ): Promise<Tree> {
-  console.log(`[saveResearchResult] Starting for User: ${userId}, Node: ${nodeId}`);
-
   return await db.runTransaction(async (transaction) => {
     const userRoot = getUserRoot(userId);
     const indexRef = userRoot.collection(META_COLLECTION).doc(INDEX_DOC);
@@ -304,9 +300,6 @@ export async function saveResearchResult(
     const ideal = tree.goal.idealStates.find((i) => i.id === nodeId);
 
     if (!ideal) {
-      console.error(
-        `[saveResearchResult] Target node ${nodeId} not found in tree ${treeId}. Available IDs: ${tree.goal.idealStates.map((i) => i.id).join(", ")}`,
-      );
       throw new Error("Target node not found");
     }
 
@@ -338,10 +331,8 @@ export async function saveResearchSearchResults(
   nodeId: string,
   source: string,
   keywords: string[],
-  results: SearchResultItem[],
+  results: { snippet: string; title: string; url: string }[],
 ): Promise<Tree> {
-  console.log(`[saveResearchSearchResults] Starting for User: ${userId}, Node: ${nodeId}`);
-
   return await db.runTransaction(async (transaction) => {
     const userRoot = getUserRoot(userId);
     const indexRef = userRoot.collection(META_COLLECTION).doc(INDEX_DOC);
@@ -362,9 +353,6 @@ export async function saveResearchSearchResults(
     const ideal = tree.goal.idealStates.find((i) => i.id === nodeId);
 
     if (!ideal) {
-      console.error(
-        `[saveResearchSearchResults] Target node ${nodeId} not found in tree ${treeId}. Available IDs: ${tree.goal.idealStates.map((i) => i.id).join(", ")}`,
-      );
       throw new Error("Target node not found");
     }
 
@@ -372,7 +360,7 @@ export async function saveResearchSearchResults(
       createdAt: new Date().toISOString(),
       id: randomUUID(),
       keywords,
-      results, // Save the list of results directly
+      results,
       source: source,
     };
 
@@ -383,4 +371,33 @@ export async function saveResearchSearchResults(
 
     return tree;
   });
+}
+
+export async function setElementProposal(
+  userId: string,
+  nodeId: string,
+  type: "decomposition" | "refinement",
+  status: "processing" | "completed" | "failed",
+  data?: any,
+): Promise<void> {
+  const tree = await getTree(userId);
+  if (!tree) throw new Error("Tree not found");
+
+  let target: Goal | IdealState | undefined;
+
+  if (tree.goal.id === nodeId) {
+    target = tree.goal;
+  } else {
+    target = tree.goal.idealStates.find((i) => i.id === nodeId);
+  }
+
+  if (target) {
+    target.pendingProposal = {
+      type,
+      status,
+      data: data || null,
+      createdAt: new Date().toISOString(),
+    };
+    await saveTree(userId, tree);
+  }
 }

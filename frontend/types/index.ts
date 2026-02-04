@@ -15,6 +15,7 @@ export interface Tree {
 
 export interface ElementProposal {
   type: "decomposition" | "refinement";
+  status?: "processing" | "completed" | "failed";
   data: any;
   createdAt: string;
 }

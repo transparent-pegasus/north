@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, Trash2 } from "lucide-react";
+import { Lock, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useModal } from "@/components/ModalProvider";
 import { apiFetch } from "@/lib/api";
@@ -20,34 +20,41 @@ interface TreeListProps {
     } | null,
   ) => void;
   onRefresh: () => void;
-  version: number;
   processingNodes?: Set<string>;
+  treeId?: string;
+  tree: Tree | null;
+  onUpdateTree: (tree: Tree | null) => void;
+  isLoading: boolean;
+  onAddTree?: () => void;
+  isLimitReached?: boolean;
 }
 
 export default function TreeList({
   onNodeSelect,
   onRefresh,
-  version,
   processingNodes,
+  tree,
+  onUpdateTree,
+  isLoading,
+  onAddTree,
+  isLimitReached,
 }: TreeListProps) {
   const { showIdealStatePrompt } = useModal();
-  const [tree, setTree] = useState<Tree | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log(`[TreeList] Fetching tree data (v${version})`);
-    apiFetch("/api/tree")
-      .then((res) => {
-        if (!res.ok) throw new Error(res.statusText);
+    if (!tree) return;
+    const hasProcessing =
+      tree.goal.pendingProposal?.status === "processing" ||
+      tree.goal.idealStates.some((i) => i.pendingProposal?.status === "processing");
 
-        return res.json();
-      })
-      .then(setTree)
-      .catch((e) => {
-        console.error(e);
-        setTree(null);
-      });
-  }, [version]);
+    if (hasProcessing) {
+      const timer = setTimeout(() => {
+        onRefresh();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [tree, onRefresh]);
 
   const handleSelect = (
     id: string,
@@ -77,6 +84,31 @@ export default function TreeList({
 
     if (!data) return;
 
+    // Optimistic Update
+    if (tree) {
+      const tempId = `temp-${Date.now()}`;
+      const newIdeal: IdealState = {
+        id: tempId,
+        content: data.content,
+        condition: data.condition
+          ? { id: `temp-cond-${Date.now()}`, content: data.condition }
+          : null,
+        currentState: data.currentState
+          ? { id: `temp-curr-${Date.now()}`, content: data.currentState }
+          : null,
+        researchResults: [],
+        researchSpec: null,
+      };
+
+      onUpdateTree({
+        ...tree,
+        goal: {
+          ...tree.goal,
+          idealStates: [...tree.goal.idealStates, newIdeal],
+        },
+      });
+    }
+
     await apiFetch("/api/add-element", {
       body: JSON.stringify({ ...data, parentId }),
       headers: { "Content-Type": "application/json" },
@@ -96,13 +128,45 @@ export default function TreeList({
       };
     });
 
-    setTree({
+    onUpdateTree({
       ...tree,
       goal: { ...tree.goal, idealStates: newIdeals },
     });
   };
 
-  if (!tree) return <div className="p-4 text-center text-stone-400 text-sm">読み込み中...</div>;
+  if (isLoading) {
+    return <div className="p-4 text-center text-stone-400 text-sm">読み込み中...</div>;
+  }
+
+  if (!tree) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
+        <button
+          onClick={isLimitReached ? undefined : onAddTree}
+          disabled={isLimitReached}
+          className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${
+            isLimitReached
+              ? "bg-stone-100 dark:bg-stone-800 cursor-not-allowed"
+              : "bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 cursor-pointer"
+          }`}
+        >
+          {isLimitReached ? (
+            <Lock className="w-8 h-8 text-stone-300 dark:text-stone-600" />
+          ) : (
+            <Plus className="w-8 h-8 text-stone-400" />
+          )}
+        </button>
+        <h2 className="text-xl font-bold text-stone-700 dark:text-stone-300 mb-2">
+          {isLimitReached ? "作成上限に達しました" : "ゴールがありません"}
+        </h2>
+        <p className="text-stone-500 dark:text-stone-400 max-w-sm">
+          {isLimitReached
+            ? "新しいゴールを作成するには、既存のゴールを削除してください。"
+            : "上のアイコンをクリックして、新しいゴールを作成しましょう。"}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full overflow-y-auto p-4">
@@ -157,7 +221,8 @@ function AddButton({ label, onClick }: { onClick: () => void; label: string }) {
 
 function GoalNode({ goal, onAdd, ...props }: { goal: Goal } & NodeProps) {
   const isSelected = props.selectedId === goal.id;
-  const isProcessing = props.processingNodes?.has(goal.id);
+  const isProcessing =
+    props.processingNodes?.has(goal.id) || goal.pendingProposal?.status === "processing";
 
   return (
     <div className="flex flex-col gap-2">
@@ -303,7 +368,8 @@ function ResearchResultItem({ nodeId, onDeleteResearch, onRefresh, res }: Resear
 
 function IdealStateNode({ ideal, ...props }: { ideal: IdealState } & NodeProps) {
   const isSelected = props.selectedId === ideal.id;
-  const isProcessing = props.processingNodes?.has(ideal.id);
+  const isProcessing =
+    props.processingNodes?.has(ideal.id) || ideal.pendingProposal?.status === "processing";
   const hasResearch = ideal.researchResults && ideal.researchResults.length > 0;
 
   return (

@@ -8,7 +8,7 @@ import RefineProposalModal from "@/components/RefineProposalModal";
 import ResearchModal from "@/components/ResearchModal";
 import { apiFetch } from "@/lib/api";
 import { config } from "@/lib/config";
-import type { RefinementData } from "@/types";
+import type { RefinementData, Tree } from "@/types";
 
 interface DecompositionProposal {
   additions: { condition: string; current: string; ideal: string }[];
@@ -26,17 +26,25 @@ interface ControlPanelProps {
     researchSpec?: any;
     type: "goal" | "ideal";
   } | null;
+  tree: Tree | null;
+  onUpdateTree: (tree: Tree | null) => void;
   setGlobalLoading: (loading: boolean | string) => void;
   onProcessingStart: (id: string) => void;
   onProcessingEnd: (id: string) => void;
+  onClose?: () => void;
+  version: number;
 }
 
 export default function ControlPanel({
   onDecompose,
   selectedNode,
+  tree,
+  onUpdateTree,
   setGlobalLoading,
   onProcessingStart,
   onProcessingEnd,
+  onClose,
+  version,
 }: ControlPanelProps) {
   const { showConfirm, showError } = useModal();
   const [loading, setLoading] = useState(false);
@@ -44,7 +52,7 @@ export default function ControlPanel({
   const [conditionInput, setConditionInput] = useState("");
   const [currentStateInput, setCurrentStateInput] = useState("");
   const [refineInstruction, setRefineInstruction] = useState("");
-  const [maxItems, setMaxItems] = useState(5);
+  const [maxItems, setMaxItems] = useState<number | string>(3);
   const [suggestion, setSuggestion] = useState<RefinementData | null>(null);
   const [decomposeProposal, setDecomposeProposal] = useState<DecompositionProposal | null>(null);
   const [selectedAdditionIndices, setSelectedAdditionIndices] = useState<Set<number>>(new Set());
@@ -95,6 +103,11 @@ export default function ControlPanel({
     if (selectedNode?.pendingProposal) {
       const proposal = selectedNode.pendingProposal;
 
+      // Skip if processing or failed
+      if (proposal.status === "processing" || proposal.status === "failed") {
+        return;
+      }
+
       console.log("DEBUG: Found pending proposal", proposal);
 
       if (proposal.type === "decomposition") {
@@ -123,8 +136,10 @@ export default function ControlPanel({
       }
     }
 
+    // Use version to trigger refetch
+    const _v = version;
     fetchUsage();
-  }, [selectedNode, fetchUsage]);
+  }, [selectedNode, fetchUsage, version]);
 
   const withLoading = async (fn: () => Promise<void>) => {
     setLoading(true);
@@ -139,9 +154,41 @@ export default function ControlPanel({
     }
   };
 
-  const handleUpdate = () =>
-    withLoading(async () => {
-      if (!selectedNode || !contentInput) return;
+  const handleUpdate = async () => {
+    if (!selectedNode || !contentInput || !tree) return;
+    setLoading(true);
+
+    // Optimistic Update
+    if (selectedNode.type === "goal") {
+      onUpdateTree({
+        ...tree,
+        goal: { ...tree.goal, content: contentInput },
+      });
+    } else {
+      const newIdeals = tree.goal.idealStates.map((ideal) => {
+        if (ideal.id !== selectedNode.id) return ideal;
+        return {
+          ...ideal,
+          content: contentInput,
+          condition: ideal.condition
+            ? { ...ideal.condition, content: conditionInput }
+            : conditionInput
+              ? { id: `temp-cond-${Date.now()}`, content: conditionInput }
+              : null,
+          currentState: ideal.currentState
+            ? { ...ideal.currentState, content: currentStateInput }
+            : currentStateInput
+              ? { id: `temp-curr-${Date.now()}`, content: currentStateInput }
+              : null,
+        };
+      });
+      onUpdateTree({
+        ...tree,
+        goal: { ...tree.goal, idealStates: newIdeals },
+      });
+    }
+
+    try {
       await apiFetch("/api/element", {
         body: JSON.stringify({
           condition: conditionInput,
@@ -154,7 +201,13 @@ export default function ControlPanel({
         method: "PUT",
       });
       onDecompose(true);
-    });
+    } catch (e) {
+      console.error(e);
+      onDecompose(true); // Sync back on error
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleError = async (data: any, defaultMsg: string) => {
     if (data.code === "QUOTA_EXCEEDED") {
@@ -167,12 +220,19 @@ export default function ControlPanel({
   };
 
   const handleDelete = async () => {
-    if (!selectedNode || selectedNode.type === "goal") return;
+    if (!selectedNode || selectedNode.type === "goal" || !tree) return;
     const ok = await showConfirm("この要素を削除しますか？");
 
     if (!ok) return;
     setLoading(true);
-    setGlobalLoading(true);
+
+    // Optimistic Update
+    const newIdeals = tree.goal.idealStates.filter((ideal) => ideal.id !== selectedNode.id);
+    onUpdateTree({
+      ...tree,
+      goal: { ...tree.goal, idealStates: newIdeals },
+    });
+
     try {
       const res = await apiFetch("/api/element", {
         body: JSON.stringify({
@@ -185,14 +245,16 @@ export default function ControlPanel({
 
       if (!res.ok) {
         const data = await res.json();
-
         await handleError(data, "削除に失敗しました");
+        onDecompose(); // Sync back
       } else {
         onDecompose();
       }
+    } catch (e) {
+      console.error(e);
+      onDecompose(); // Sync back
     } finally {
       setLoading(false);
-      setGlobalLoading(false);
     }
   };
 
@@ -202,7 +264,7 @@ export default function ControlPanel({
     // Start background processing
     const nodeId = selectedNode.id;
     const currentNodeType = selectedNode.type;
-    const currentMaxItems = maxItems;
+    const currentMaxItems = Number(maxItems) || 5;
     onProcessingStart(nodeId);
 
     // Show dismissible message (Wait, we rely on Parent to make it dismissible or non-blocking)
@@ -488,7 +550,7 @@ export default function ControlPanel({
               min={1}
               max={20}
               value={maxItems}
-              onChange={(e) => setMaxItems(Number(e.target.value) || 5)}
+              onChange={(e) => setMaxItems(e.target.value)}
               className="w-16 px-2 py-1 text-sm text-center rounded border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100"
             />
           </div>
@@ -662,16 +724,16 @@ export default function ControlPanel({
                 }
                 setIsResearchModalOpen(true);
               }}
-              className={`w-full py-2 text-sm font-medium border rounded disabled:opacity-40 flex items-center justify-center gap-2 transition-colors ${
+              className={`w-full py-2 text-sm font-medium rounded disabled:opacity-40 flex items-center justify-center gap-2 transition-colors ${
                 usage.research >= LIMITS.research
-                  ? "bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-600 border-stone-200 dark:border-stone-700 cursor-not-allowed"
-                  : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  ? "bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-600 cursor-not-allowed"
+                  : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30"
               }`}
             >
               <BookOpen className="w-4 h-4" />
               リサーチ
               {usage.research >= LIMITS.research && (
-                <span className="text-xs opacity-70">(制限)</span>
+                <span className="ml-2 text-xs opacity-70">(制限到達)</span>
               )}
             </button>
             <div className="border-t border-stone-100 dark:border-stone-800 my-2" />
@@ -698,8 +760,6 @@ export default function ControlPanel({
                   // So passing undefined/null should work if we change frontend to allow it.
                   // BUT my frontend hook call needs to be correct.
                   // I will assume backend handles it or I will pass treeIndex.activeTreeId via props if needed.
-                  // Actually, let's fetch active tree info via API?? No, ControlPanel is dumb component usually.
-
                   // Actually, I can use a hack: pass "" as treeId, and backend getTree("") returns active tree.
                   await apiFetch("/api/promote", {
                     body: JSON.stringify({
@@ -710,6 +770,8 @@ export default function ControlPanel({
                     method: "POST",
                   });
                   onDecompose(true);
+                  // Close modal on success
+                  onClose?.();
                 } catch (e) {
                   console.error(e);
                   // alert("失敗しました");
@@ -746,6 +808,8 @@ export default function ControlPanel({
         onClose={() => setIsResearchModalOpen(false)}
         nodeId={selectedNode.id}
         initialSpec={selectedNode.researchSpec}
+        tree={tree}
+        onUpdateTree={onUpdateTree}
         onResearchComplete={() => {
           onDecompose(false);
           setIsResearchModalOpen(false);

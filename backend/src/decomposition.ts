@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { generateContemplation } from "./ai";
-import { getTree, saveTree } from "./tree";
+import { getTree, saveTree, setElementProposal } from "./tree";
 import type { Goal, IdealState, ResearchSpec, SourceType, Tree } from "./types";
 
 interface ElementEvaluation {
@@ -39,9 +39,6 @@ const SOURCES_LIST: SourceType[] = [
   "hackaday",
 ];
 
-/**
- * Decompose a goal into ideal states with iterative refinement.
- */
 export async function decompose(
   userId: string,
   targetId: string,
@@ -52,7 +49,11 @@ export async function decompose(
     return null;
   }
 
+  // Set processing status
+  await setElementProposal(userId, targetId, "decomposition", "processing");
+
   const tree = await getTree(userId);
+  if (!tree) return null;
 
   if (tree.goal.id !== targetId) return null;
 
@@ -60,36 +61,38 @@ export async function decompose(
   const addedIds: string[] = [];
   let finalProposal: DecomposeLoopResult | null = null;
 
-  for (let loopIndex = 0; loopIndex < loops; loopIndex++) {
-    const goal = tree.goal;
-    const currentIdeals = goal.idealStates.map((i) => ({
-      content: i.content,
-      id: i.id,
-    }));
-    const existingCount = currentIdeals.length;
-    const slotsAvailable = Math.max(0, maxItems - existingCount + addedIds.length);
+  try {
+    for (let loopIndex = 0; loopIndex < loops; loopIndex++) {
+      const goal = tree.goal;
+      const currentIdeals = goal.idealStates.map((i) => ({
+        content: i.content,
+        id: i.id,
+      }));
+      const existingCount = currentIdeals.length;
+      const slotsAvailable = Math.max(0, maxItems - existingCount + addedIds.length);
 
-    const prompt = buildPrompt(goal, currentIdeals, addedIds, slotsAvailable, loopIndex);
+      const prompt = buildPrompt(goal, currentIdeals, addedIds, slotsAvailable, loopIndex);
 
-    console.log(`DEBUG: Decomposition Loop ${loopIndex + 1} Prompt:`, prompt);
-    const result = await generateContemplation(prompt, null);
+      console.log(`DEBUG: Decomposition Loop ${loopIndex + 1} Prompt:`, prompt);
+      const result = await generateContemplation(prompt, null);
 
-    console.log(`DEBUG: Decomposition Loop ${loopIndex + 1} Result:`, result);
+      console.log(`DEBUG: Decomposition Loop ${loopIndex + 1} Result:`, result);
 
-    if (result) {
-      finalProposal = parseResult(result);
-      // Update local state for next loop iteration
-      // (Simplified: we use the last valid proposal as the final one)
+      if (result) {
+        finalProposal = parseResult(result);
+        // Update local state for next loop iteration if needed
+      }
     }
-  }
 
-  if (finalProposal) {
-    tree.goal.pendingProposal = {
-      createdAt: new Date().toISOString(),
-      data: finalProposal,
-      type: "decomposition",
-    };
-    await saveTree(userId, tree);
+    if (finalProposal) {
+      await setElementProposal(userId, targetId, "decomposition", "completed", finalProposal);
+    } else {
+      await setElementProposal(userId, targetId, "decomposition", "failed");
+    }
+  } catch (error) {
+    console.error("Decomposition error:", error);
+    await setElementProposal(userId, targetId, "decomposition", "failed");
+    throw error;
   }
 
   return finalProposal;
@@ -101,6 +104,7 @@ export async function applyDecomposition(
   proposal: DecomposeLoopResult,
 ): Promise<Tree> {
   const tree = await getTree(userId);
+  if (!tree) throw new Error("Tree not found");
 
   if (tree.goal.id !== targetId) {
     throw new Error("Goal ID mismatch");

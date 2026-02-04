@@ -14,6 +14,9 @@ describe("Decomposition Logic", () => {
   // Mock implementations
   const mockSaveTree = treeModule.saveTree as jest.MockedFunction<typeof treeModule.saveTree>;
   const mockGetTree = treeModule.getTree as jest.MockedFunction<typeof treeModule.getTree>;
+  const mockSetElementProposal = treeModule.setElementProposal as jest.MockedFunction<
+    typeof treeModule.setElementProposal
+  >;
   const mockGenerateContemplation = ai.generateContemplation as jest.MockedFunction<
     typeof ai.generateContemplation
   >;
@@ -74,11 +77,22 @@ describe("Decomposition Logic", () => {
       additions: [{ ideal: "Final Ideal", current: "", condition: "" }],
     });
 
-    // Should save the pending proposal
-    expect(mockSaveTree).toHaveBeenCalled();
-    const savedTree = mockSaveTree.mock.calls[0][1];
-    expect(savedTree.goal.pendingProposal).not.toBeNull();
-    expect(savedTree.goal.pendingProposal?.data).toEqual(result);
+    // Should set proposal status
+    // 1. Initial processing
+    expect(mockSetElementProposal).toHaveBeenCalledWith(
+      userId,
+      goalId,
+      "decomposition",
+      "processing",
+    );
+    // 2. Final completed
+    expect(mockSetElementProposal).toHaveBeenCalledWith(
+      userId,
+      goalId,
+      "decomposition",
+      "completed",
+      result,
+    );
   });
 
   it("should apply decomposition correctly", async () => {

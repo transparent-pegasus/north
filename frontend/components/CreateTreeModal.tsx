@@ -3,11 +3,12 @@
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import type { Tree } from "@/types";
 
 interface CreateTreeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (tree: Tree) => void;
 }
 
 export default function CreateTreeModal({ isOpen, onClose, onCreated }: CreateTreeModalProps) {
@@ -20,13 +21,20 @@ export default function CreateTreeModal({ isOpen, onClose, onCreated }: CreateTr
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await apiFetch("/api/trees", {
+      const res = await apiFetch("/api/trees", {
         body: JSON.stringify({ name: name.trim() }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
+
+      if (!res.ok) {
+        throw new Error("Failed to create tree");
+      }
+
+      const newTree: Tree = await res.json();
+
       setName("");
-      onCreated();
+      onCreated(newTree);
       onClose();
     } finally {
       setLoading(false);

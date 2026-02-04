@@ -1,5 +1,5 @@
 import { generateContemplation } from "./ai";
-import { getTree, saveTree } from "./tree";
+import { getTree, saveTree, setElementProposal } from "./tree";
 
 export async function suggestRefine(
   uid: string,
@@ -7,15 +7,20 @@ export async function suggestRefine(
   elementType: "goal" | "ideal",
   instruction: string,
 ) {
-  const tree = await getTree(uid);
+  // Set processing status
+  await setElementProposal(uid, elementId, "refinement", "processing");
 
-  if (elementType === "ideal") {
-    // --- IDEAL STATE REFINEMENT (Holistic) ---
-    const ideal = tree.goal.idealStates.find((i) => i.id === elementId);
+  try {
+    const tree = await getTree(uid);
+    if (!tree) throw new Error("Tree not found");
 
-    if (!ideal) throw new Error("Ideal state not found");
+    if (elementType === "ideal") {
+      // --- IDEAL STATE REFINEMENT (Holistic) ---
+      const ideal = tree.goal.idealStates.find((i) => i.id === elementId);
 
-    const prompt = `
+      if (!ideal) throw new Error("Ideal state not found");
+
+      const prompt = `
 Target Element: Ideal State
 - Content (Ideal State): "${ideal.content}"
 - Current State: "${ideal.currentState?.content || "(Unspecified)"}"
@@ -39,45 +44,40 @@ Output JSON:
 }
 `;
 
-    console.log("DEBUG: Ideal Refine Prompt:", prompt);
-    const result = await generateContemplation(prompt, null);
+      console.log("DEBUG: Ideal Refine Prompt:", prompt);
+      const result = await generateContemplation(prompt, null);
 
-    console.log("DEBUG: Ideal Refine Result:", result);
+      console.log("DEBUG: Ideal Refine Result:", result);
 
-    if (result) {
-      const proposal = {
-        createdAt: new Date().toISOString(),
-        data: result,
-        type: "refinement" as const,
-      };
+      if (result) {
+        await setElementProposal(uid, elementId, "refinement", "completed", result);
+      } else {
+        await setElementProposal(uid, elementId, "refinement", "failed");
+      }
 
-      ideal.pendingProposal = proposal;
-      await saveTree(uid, tree);
+      return result;
     }
 
-    return result;
-  }
+    // --- GOAL REFINEMENT (Legacy / Single Field) ---
+    const fields: { name: string; key: string; value: string }[] = [];
 
-  // --- GOAL REFINEMENT (Legacy / Single Field) ---
-  const fields: { name: string; key: string; value: string }[] = [];
-
-  if (elementType === "goal") {
-    if (tree.goal.id === elementId) {
-      fields.push({
-        key: "content",
-        name: "Goal Content",
-        value: tree.goal.content,
-      });
+    if (elementType === "goal") {
+      if (tree.goal.id === elementId) {
+        fields.push({
+          key: "content",
+          name: "Goal Content",
+          value: tree.goal.content,
+        });
+      }
     }
-  }
 
-  if (fields.length === 0) {
-    throw new Error("Element not found");
-  }
+    if (fields.length === 0) {
+      throw new Error("Element not found");
+    }
 
-  const fieldsText = fields.map((f) => `- ${f.name} (${f.key}): "${f.value}"`).join("\n");
+    const fieldsText = fields.map((f) => `- ${f.name} (${f.key}): "${f.value}"`).join("\n");
 
-  const prompt = `
+    const prompt = `
 Target Elements:
 ${fieldsText}
 
@@ -101,40 +101,35 @@ Output JSON:
 }
 `;
 
-  console.log("DEBUG: Refine Prompt:", prompt);
-  const result = await generateContemplation(prompt, null);
+    console.log("DEBUG: Refine Prompt:", prompt);
+    const result = await generateContemplation(prompt, null);
 
-  console.log("DEBUG: Refine Result:", result);
+    console.log("DEBUG: Refine Result:", result);
 
-  if (result) {
-    const proposal = {
-      createdAt: new Date().toISOString(),
-      data: result,
-      type: "refinement" as const,
-    };
-
-    if (elementType === "goal" && tree.goal.id === elementId) {
-      tree.goal.pendingProposal = proposal;
+    if (result) {
+      await setElementProposal(uid, elementId, "refinement", "completed", result);
+    } else {
+      await setElementProposal(uid, elementId, "refinement", "failed");
     }
-    await saveTree(uid, tree);
-  }
 
-  return result;
+    return result;
+  } catch (error) {
+    console.error("Refinement error:", error);
+    await setElementProposal(uid, elementId, "refinement", "failed");
+    throw error;
+  }
 }
 
 export async function applyRefine(
   uid: string,
   elementId: string,
   elementType: "goal" | "ideal",
-  newContent: any, // Expecting RefinementData structure or partial
+  newContent: any,
 ) {
   const tree = await getTree(uid);
-  let updated = false;
+  if (!tree) throw new Error("Tree not found");
 
-  // newContent might be passed as simple string (legacy) or object (new)
-  // But strictly speaking, caller should pass the suggestion list or map.
-  // We'll assume the caller (ControlPanel) passes the applied suggestions array or values.
-  // For simplicity, let's say 'newContent' argument holds the map of field->value to update.
+  let updated = false;
 
   const updates = typeof newContent === "object" ? newContent : { content: newContent };
 
@@ -143,7 +138,7 @@ export async function applyRefine(
       if (updates.content) {
         tree.goal.content = updates.content;
       }
-      tree.goal.pendingProposal = null; // Clear proposal
+      tree.goal.pendingProposal = null;
       updated = true;
     }
   } else {
@@ -152,14 +147,14 @@ export async function applyRefine(
     if (ideal) {
       if (updates.content) ideal.content = updates.content;
       if (updates.condition) {
-        if (!ideal.condition) ideal.condition = { content: "", id: `${elementId}-cond` }; // rudimentary id gen
+        if (!ideal.condition) ideal.condition = { content: "", id: `${elementId}-cond` };
         ideal.condition.content = updates.condition;
       }
       if (updates.currentState) {
         if (!ideal.currentState) ideal.currentState = { content: "", id: `${elementId}-curr` };
         ideal.currentState.content = updates.currentState;
       }
-      ideal.pendingProposal = null; // Clear proposal
+      ideal.pendingProposal = null;
       updated = true;
     }
   }

@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 
 import { useModal } from "@/components/ModalProvider";
 import { apiFetch } from "@/lib/api";
-import { AVAILABLE_SOURCES, type ResearchSpec, type SourceType } from "@/types";
+import { AVAILABLE_SOURCES, type ResearchSpec, type SourceType, type Tree } from "@/types";
 
 interface ResearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialSpec?: ResearchSpec | null;
   nodeId: string;
+  tree: Tree | null;
+  onUpdateTree: (tree: Tree | null) => void;
   onResearchComplete: () => void;
   setGlobalLoading: (loading: boolean | string) => void;
 }
@@ -19,6 +21,8 @@ export default function ResearchModal({
   initialSpec,
   isOpen,
   nodeId,
+  tree,
+  onUpdateTree,
   onClose,
   onResearchComplete,
   setGlobalLoading,
@@ -95,9 +99,32 @@ export default function ResearchModal({
   };
 
   const handleManualAdd = async () => {
-    if (!manualTitle.trim() || !manualUrl.trim()) return;
+    if (!manualTitle.trim() || !manualUrl.trim() || !tree) return;
     setLoading(true);
-    setGlobalLoading("保存中...");
+
+    // Optimistic Update
+    const newIdeals = tree.goal.idealStates.map((ideal) => {
+      if (ideal.id !== nodeId) return ideal;
+
+      const newResult = {
+        id: `temp-res-${Date.now()}`,
+        source: "manual",
+        keywords: [],
+        results: [{ title: manualTitle, url: manualUrl, snippet: manualSnippet }],
+        createdAt: new Date().toISOString(),
+      };
+
+      return {
+        ...ideal,
+        researchResults: [...(ideal.researchResults || []), newResult],
+      };
+    });
+
+    onUpdateTree({
+      ...tree,
+      goal: { ...tree.goal, idealStates: newIdeals },
+    });
+
     try {
       const res = await apiFetch("/api/research/manual", {
         body: JSON.stringify({
@@ -120,9 +147,9 @@ export default function ResearchModal({
     } catch (e: any) {
       console.error(e);
       await showError(`保存に失敗しました: ${e.message || "Unknown error"}`);
+      onResearchComplete(); // Re-sync
     } finally {
       setLoading(false);
-      setGlobalLoading(false);
     }
   };
 
@@ -212,7 +239,7 @@ export default function ResearchModal({
                   disabled={loading || !keywords}
                   className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50"
                 >
-                  {loading ? "リサーチ実行中..." : "リサーチを実行 (文献自動リンク)"}
+                  {loading ? "リサーチ実行中..." : "リサーチを実行"}
                 </button>
               </div>
             </div>
@@ -272,7 +299,7 @@ export default function ResearchModal({
                   disabled={loading || !manualTitle || !manualUrl}
                   className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium disabled:opacity-50"
                 >
-                  {loading ? "保存中..." : "追加する"}
+                  {loading ? "保存中..." : "追加"}
                 </button>
               </div>
             </div>

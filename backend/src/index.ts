@@ -1,3 +1,4 @@
+import { config } from "./config";
 import type { Tree } from "./types";
 
 import cors = require("cors");
@@ -8,7 +9,6 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onRequest } from "firebase-functions/v2/https";
-import { config } from "./config";
 
 import { applyDecomposition, decompose } from "./decomposition";
 import { applyRefine, suggestRefine } from "./refinement";
@@ -185,8 +185,28 @@ app.get("/trees", async (req, res) => {
 app.post("/trees", async (req, res) => {
   try {
     const uid = req.user.uid;
+
+    // Check tree limit
+    const index = await listTrees(uid);
+    if (index.trees.length >= config.limits.maxTrees) {
+      res.status(403).json({ error: "Tree creation limit reached" });
+      return;
+    }
+
     const { name } = req.body;
     const tree = await createTree(uid, name || "新しいゴール");
+
+    res.json(tree);
+  } catch (error: any) {
+    handleError(res, error);
+  }
+});
+
+app.get("/trees/:id", async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const id = req.params.id;
+    const tree = await getTree(uid, id);
 
     res.json(tree);
   } catch (error: any) {
@@ -486,10 +506,13 @@ app.get("/user/limits", async (req, res) => {
 
     const data = doc.data() || {};
 
+    const treeIndex = await listTrees(uid);
+
     res.json({
       decompose: data.decompose || 0,
       refine: data.refine || 0,
       research: data.research || 0,
+      treeCount: treeIndex.trees.length,
     });
   } catch (error: any) {
     console.error(error);

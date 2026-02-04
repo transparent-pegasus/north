@@ -1,6 +1,6 @@
 "use client";
 
-import { Hand, LogOut, Menu, Plus, Shield, Trash2 } from "lucide-react";
+import { Hand, Lock, LogOut, Menu, Plus, Shield, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import BottomNavigation from "@/components/BottomNavigation";
 import ControlPanel from "@/components/ControlPanel";
@@ -11,7 +11,8 @@ import TitleScreen from "@/components/TitleScreen";
 import TreeList from "@/components/TreeList";
 import TreeSelectorDrawer from "@/components/TreeSelectorDrawer";
 import { apiFetch } from "@/lib/api";
-import type { TreeIndex } from "@/types";
+import { config } from "@/lib/config";
+import type { Tree, TreeIndex } from "@/types";
 
 // Minimal compass logo - simple geometric north arrow
 function CompassLogo({ className }: { className?: string }) {
@@ -56,6 +57,10 @@ export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [processingNodes, setProcessingNodes] = useState<Set<string>>(new Set());
 
+  // Tree Detail State
+  const [tree, setTree] = useState<Tree | null>(null);
+  const [isTreeLoading, setIsTreeLoading] = useState(false);
+
   const isGlobalLoading = !!globalLoadingMessage;
   const setGlobalLoading = (loading: boolean | string) => {
     if (typeof loading === "string") {
@@ -94,14 +99,13 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
-      console.log(`[App] Refreshing tree index (v${version})`);
       apiFetch("/api/trees")
         .then((res) => {
           if (res.status === 401) {
             console.warn("Unauthorized, forcing logout");
             auth.signOut();
 
-            return null; // Stop processing
+            return null;
           }
           if (!res.ok) throw new Error(res.statusText);
 
@@ -112,7 +116,26 @@ export default function Home() {
         })
         .catch(console.error);
     }
-  }, [version, user]);
+  }, [user]);
+
+  // Fetch Active Tree
+  useEffect(() => {
+    const treeId = treeIndex?.activeTreeId;
+    if (!user || !treeId) {
+      setTree(null);
+      return;
+    }
+
+    setIsTreeLoading(true);
+    apiFetch(`/api/trees/${treeId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText);
+        return res.json();
+      })
+      .then(setTree)
+      .catch(console.error)
+      .finally(() => setIsTreeLoading(false));
+  }, [user, treeIndex?.activeTreeId]);
 
   const refreshTree = (keepSelection = false) => {
     setVersion((v) => v + 1);
@@ -120,6 +143,10 @@ export default function Home() {
       setSelectedNode(null);
       setIsMobilePanelOpen(false); // Close panel on refresh if new selection or done
     }
+  };
+
+  const handleUpdateTree = (newTree: Tree | null) => {
+    setTree(newTree);
   };
 
   const handleSelectNode = (node: any) => {
@@ -130,19 +157,58 @@ export default function Home() {
     }
   };
 
+  const isTreeIndexLoading = !treeIndex;
+  const treeCount = treeIndex?.trees?.length || 0;
+  const maxTrees = config.limits.maxTrees;
+  const isLimitReached = treeCount >= maxTrees;
+  const isCreationDisabled = isTreeIndexLoading || isLimitReached;
+
   const handleDeleteTree = async () => {
     if (!treeIndex?.activeTreeId) return;
     const ok = await showConfirm("このゴールを削除しますか？");
 
     if (!ok) return;
-    await apiFetch(`/api/trees/${treeIndex.activeTreeId}`, {
+
+    const deletedId = treeIndex.activeTreeId;
+
+    // Optimistic Update: Remove tree from list immediately
+    const remainingTrees = treeIndex.trees.filter((t) => t.id !== deletedId);
+    const newActiveId = remainingTrees[0]?.id || "";
+    setTreeIndex({
+      ...treeIndex,
+      trees: remainingTrees,
+      activeTreeId: newActiveId,
+    });
+
+    // Background delete
+    await apiFetch(`/api/trees/${deletedId}`, {
       method: "DELETE",
     });
+
+    // Refresh to sync with server
     refreshTree();
   };
 
   const handleSelectTree = async (id: string) => {
+    // Optimistic Update
+    if (treeIndex) {
+      setTreeIndex({ ...treeIndex, activeTreeId: id });
+    }
+    // Background update
     await apiFetch(`/api/trees/${id}/active`, { method: "PUT" });
+    refreshTree();
+  };
+
+  const handleTreeCreated = (newTree: Tree) => {
+    if (!treeIndex) return;
+
+    setTreeIndex({
+      trees: [
+        ...treeIndex.trees,
+        { id: newTree.id, name: newTree.name, updatedAt: newTree.updatedAt },
+      ],
+      activeTreeId: newTree.id,
+    });
     refreshTree();
   };
 
@@ -220,7 +286,7 @@ export default function Home() {
       <CreateTreeModal
         isOpen={isCreateModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onCreated={refreshTree}
+        onCreated={handleTreeCreated}
       />
 
       {/* Tree Selector Drawer (Mobile) */}
@@ -258,11 +324,22 @@ export default function Home() {
           )}
 
           <button
-            onClick={() => setCreateModalOpen(true)}
-            className="p-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 rounded hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-            title="新規作成"
+            onClick={() => !isCreationDisabled && setCreateModalOpen(true)}
+            disabled={isCreationDisabled}
+            className={`p-1.5 rounded transition-colors ${
+              isCreationDisabled
+                ? "text-stone-300 dark:text-stone-600 bg-stone-100 dark:bg-stone-800/50 cursor-not-allowed"
+                : "text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
+            }`}
+            title={
+              isTreeIndexLoading
+                ? "読み込み中..."
+                : isLimitReached
+                  ? `作成上限に達しました (${treeCount}/${maxTrees})`
+                  : `新規作成 (${treeCount}/${maxTrees})`
+            }
           >
-            <Plus className="w-5 h-5" />
+            {isLimitReached ? <Lock className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
           </button>
 
           {treeIndex && Array.isArray(treeIndex.trees) && treeIndex.trees.length > 0 && (
@@ -346,20 +423,27 @@ export default function Home() {
         <div className="flex-1 bg-white dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800 overflow-hidden min-h-[300px] lg:min-h-0">
           <TreeList
             onNodeSelect={handleSelectNode}
-            version={version}
             onRefresh={refreshTree}
             processingNodes={processingNodes}
+            tree={tree}
+            onUpdateTree={handleUpdateTree}
+            isLoading={isTreeLoading}
+            onAddTree={() => !isCreationDisabled && setCreateModalOpen(true)}
+            isLimitReached={isLimitReached}
           />
         </div>
 
-        {/* Control Panel (Desktop) */}
+        {/* ControlPanel - Desktop */}
         <div className="hidden lg:block w-80 flex-shrink-0 overflow-y-auto h-full">
           <ControlPanel
             selectedNode={selectedNode}
             onDecompose={refreshTree}
+            tree={tree}
+            onUpdateTree={handleUpdateTree}
             setGlobalLoading={setGlobalLoading}
             onProcessingStart={handleAddProcessingNode}
             onProcessingEnd={handleRemoveProcessingNode}
+            version={version}
           />
         </div>
 
@@ -368,9 +452,13 @@ export default function Home() {
           <ControlPanel
             selectedNode={selectedNode}
             onDecompose={refreshTree}
+            tree={tree}
+            onUpdateTree={handleUpdateTree}
             setGlobalLoading={setGlobalLoading}
             onProcessingStart={handleAddProcessingNode}
             onProcessingEnd={handleRemoveProcessingNode}
+            onClose={() => setIsMobilePanelOpen(false)}
+            version={version}
           />
         </ControlPanelModal>
       </div>
@@ -381,6 +469,7 @@ export default function Home() {
         onAddTree={() => setCreateModalOpen(true)}
         onDeleteTree={handleDeleteTree}
         hasTrees={!!(treeIndex && Array.isArray(treeIndex.trees) && treeIndex.trees.length > 0)}
+        isLimitReached={isCreationDisabled}
       />
     </div>
   );

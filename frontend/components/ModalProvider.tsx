@@ -233,7 +233,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                         condition: e.target.value,
                       }))
                     }
-                    placeholder="例: 現在の状態から理想の状態へ移行するための条件"
+                    placeholder="例: 副業を始める"
                     type="text"
                     value={idealStateData.condition}
                   />

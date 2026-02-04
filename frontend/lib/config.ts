@@ -8,6 +8,13 @@
 const isProduction = process.env.NODE_ENV === "production";
 const isDebug = process.env.NEXT_PUBLIC_SHOW_DEBUG === "true";
 
+// Helper to safely parse limits
+const parseLimit = (val: string | undefined, defaultVal: number) => {
+  if (val === undefined || val === "") return defaultVal;
+  const n = Number(val);
+  return Number.isNaN(n) ? defaultVal : n;
+};
+
 export const config = {
   // Environment flags
   isProduction,
@@ -24,7 +31,7 @@ export const config = {
   // These values are public and safe to be exposed in the client bundle.
   firebase: {
     apiKey: "AIzaSyBzRQyIn6Hoa8KqEb8NVgebjO_FwIPk-ug",
-    authDomain: "north-c409d.firebaseapp.com",
+    authDomain: "north-c409d.web.app",
     projectId: "north-c409d",
     storageBucket: "north-c409d.firebasestorage.app",
     messagingSenderId: "895054828509",
@@ -34,8 +41,9 @@ export const config = {
 
   // Feature Limits (Client-side mirror of backend limits for UI)
   limits: {
-    decompose: 100,
-    refine: 100,
-    research: 100,
+    decompose: parseLimit(process.env.NEXT_PUBLIC_LIMIT_DECOMPOSE, 3),
+    refine: parseLimit(process.env.NEXT_PUBLIC_LIMIT_REFINE, 3),
+    research: parseLimit(process.env.NEXT_PUBLIC_LIMIT_RESEARCH, 3),
+    maxTrees: parseLimit(process.env.NEXT_PUBLIC_LIMIT_MAX_TREES, 10),
   },
 };
