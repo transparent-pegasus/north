@@ -50,17 +50,23 @@ app.use(express.json());
 
 // Rewrite /api/* to /* so that the router matches correctly
 app.use((req, _res, next) => {
+  const originalUrl = req.url;
   if (req.url.startsWith("/api")) {
     req.url = req.url.replace("/api", "");
+    if (req.url === "") req.url = "/";
   }
+  console.log(`[API Request] ${req.method} ${originalUrl} -> ${req.url} (path: ${req.path})`);
   next();
 });
 
 // --- Middleware ---
 
 const checkAuthMiddleware: express.RequestHandler = async (req, res, next) => {
-  // Public endpoints
-  if (req.path === "/health" || req.method === "OPTIONS") {
+  // Public endpoints - use req.path which matches the router's view of the world
+  // After our rewrite middleware, req.url is changed, but Express's req.path
+  // might still reflect the original path in some versions/environments.
+  const path = req.url.split("?")[0];
+  if (path === "/health" || req.method === "OPTIONS") {
     return next();
   }
 
@@ -206,7 +212,14 @@ app.get("/trees/:id", async (req, res) => {
   try {
     const uid = req.user.uid;
     const id = req.params.id;
+    console.log(`[API] Fetching tree: ${id} for user: ${uid}`);
     const tree = await getTree(uid, id);
+
+    if (!tree) {
+      console.log(`[API] Tree not found: ${id} for user: ${uid}`);
+      res.status(404).json({ error: "Tree not found" });
+      return;
+    }
 
     res.json(tree);
   } catch (error: any) {
@@ -241,7 +254,14 @@ app.put("/trees/:id/active", async (req, res) => {
 app.get("/tree", async (req, res) => {
   try {
     const uid = req.user.uid;
+    console.log(`[API] Fetching active tree for user: ${uid}`);
     const tree = await getTree(uid);
+
+    if (!tree) {
+      console.log(`[API] No active tree found for user: ${uid}`);
+      res.status(404).json({ error: "No active tree found" });
+      return;
+    }
 
     res.json(tree);
   } catch (error: any) {
