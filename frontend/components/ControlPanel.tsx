@@ -22,6 +22,7 @@ interface ControlPanelProps {
     currentState?: string;
     id: string;
     label?: string;
+    content?: string;
     pendingProposal?: any;
     researchSpec?: any;
     type: "goal" | "ideal";
@@ -32,6 +33,7 @@ interface ControlPanelProps {
   onProcessingStart: (id: string) => void;
   onProcessingEnd: (id: string) => void;
   onClose?: () => void;
+  onSwitchTree?: (id: string) => void;
   version: number;
 }
 
@@ -44,6 +46,7 @@ export default function ControlPanel({
   onProcessingStart,
   onProcessingEnd,
   onClose,
+  onSwitchTree,
   version,
 }: ControlPanelProps) {
   const { showConfirm, showError } = useModal();
@@ -78,18 +81,36 @@ export default function ControlPanel({
   }, []);
 
   useEffect(() => {
-    if (selectedNode?.label) {
-      setContentInput(selectedNode.label);
+    if (selectedNode?.label || selectedNode?.content) {
+      setContentInput(selectedNode.label || selectedNode.content || "");
     } else {
       setContentInput("");
     }
+
     if (selectedNode?.condition) {
-      setConditionInput(selectedNode.condition);
+      // condition can be string or object { id, content }
+      const anyCond = selectedNode.condition as any;
+      setConditionInput(
+        typeof anyCond === "object" && anyCond.content
+          ? anyCond.content
+          : typeof anyCond === "string"
+            ? anyCond
+            : "",
+      );
     } else {
       setConditionInput("");
     }
+
     if (selectedNode?.currentState) {
-      setCurrentStateInput(selectedNode.currentState);
+      // currentState can be string or object { id, content }
+      const anyState = selectedNode.currentState as any;
+      setCurrentStateInput(
+        typeof anyState === "object" && anyState.content
+          ? anyState.content
+          : typeof anyState === "string"
+            ? anyState
+            : "",
+      );
     } else {
       setCurrentStateInput("");
     }
@@ -420,8 +441,53 @@ export default function ControlPanel({
         updates.condition = suggestion.refinedCondition;
       } else if (suggestion.suggestions) {
         suggestion.suggestions.forEach((s) => {
-          updates[s.field] = s.value;
+          updates[s.field] = s.value; // Map 'content', 'condition', 'currentState' strings
         });
+      }
+
+      // Optimistic Update
+      if (tree) {
+        if (selectedNode.type === "goal") {
+          onUpdateTree({
+            ...tree,
+            goal: { ...tree.goal, content: updates.content || tree.goal.content },
+          });
+        } else {
+          const newIdeals = tree.goal.idealStates.map((ideal) => {
+            if (ideal.id !== selectedNode.id) return ideal;
+
+            // Helper to update sub-object or create it
+            const newCondition =
+              updates.condition !== undefined
+                ? ideal.condition
+                  ? { ...ideal.condition, content: updates.condition }
+                  : updates.condition
+                    ? { id: `temp-c-${Date.now()}`, content: updates.condition }
+                    : null
+                : ideal.condition;
+
+            const newCurrentState =
+              updates.currentState !== undefined
+                ? ideal.currentState
+                  ? { ...ideal.currentState, content: updates.currentState }
+                  : updates.currentState
+                    ? { id: `temp-s-${Date.now()}`, content: updates.currentState }
+                    : null
+                : ideal.currentState;
+
+            return {
+              ...ideal,
+              content: updates.content !== undefined ? updates.content : ideal.content,
+              condition: newCondition,
+              currentState: newCurrentState,
+            };
+          });
+
+          onUpdateTree({
+            ...tree,
+            goal: { ...tree.goal, idealStates: newIdeals },
+          });
+        }
       }
 
       const res = await apiFetch("/api/apply-refine", {
@@ -761,7 +827,7 @@ export default function ControlPanel({
                   // BUT my frontend hook call needs to be correct.
                   // I will assume backend handles it or I will pass treeIndex.activeTreeId via props if needed.
                   // Actually, I can use a hack: pass "" as treeId, and backend getTree("") returns active tree.
-                  await apiFetch("/api/promote", {
+                  const res = await apiFetch("/api/promote", {
                     body: JSON.stringify({
                       idealId: selectedNode.id,
                       treeId: "",
@@ -769,9 +835,18 @@ export default function ControlPanel({
                     headers: { "Content-Type": "application/json" },
                     method: "POST",
                   });
-                  onDecompose(true);
-                  // Close modal on success
-                  onClose?.();
+
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data.id && onSwitchTree) {
+                      onSwitchTree(data.id);
+                    } else {
+                      onDecompose(true);
+                    }
+                    onClose?.();
+                  } else {
+                    onDecompose(true);
+                  }
                 } catch (e) {
                   console.error(e);
                   // alert("失敗しました");

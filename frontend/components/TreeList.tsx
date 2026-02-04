@@ -27,6 +27,7 @@ interface TreeListProps {
   isLoading: boolean;
   onAddTree?: () => void;
   isLimitReached?: boolean;
+  selectedNodeId?: string;
 }
 
 export default function TreeList({
@@ -38,9 +39,9 @@ export default function TreeList({
   isLoading,
   onAddTree,
   isLimitReached,
+  selectedNodeId,
 }: TreeListProps) {
   const { showIdealStatePrompt } = useModal();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tree) return;
@@ -66,7 +67,6 @@ export default function TreeList({
     condition?: string,
     currentState?: string,
   ) => {
-    setSelectedId(id);
     onNodeSelect({
       childCount,
       condition,
@@ -173,7 +173,7 @@ export default function TreeList({
       <div className="max-w-2xl mx-auto flex flex-col gap-3 pb-20">
         <GoalNode
           goal={tree.goal}
-          selectedId={selectedId}
+          selectedId={selectedNodeId || null}
           onSelect={handleSelect}
           onAdd={handleAddElement}
           onRefresh={onRefresh}

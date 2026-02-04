@@ -386,7 +386,14 @@ router.post("/research/execute", rateLimitMiddleware("research"), async (req, re
     const tree = await getTree(uid);
     const ideal = tree.goal.idealStates.find((i: any) => i.id === nodeId);
     if (ideal) {
-      await saveResearchResult(uid, nodeId, ideal.researchSpec?.source || "web", ideal.researchSpec?.keywords || [], summary, url);
+      await saveResearchResult(
+        uid,
+        nodeId,
+        ideal.researchSpec?.source || "web",
+        ideal.researchSpec?.keywords || [],
+        summary,
+        url,
+      );
     }
     res.json({ summary });
   } catch (error: any) {
@@ -430,7 +437,12 @@ router.get("/user/limits", async (req, res) => {
     const uid = req.user.uid;
     const now = new Date();
     const dateKey = now.toISOString().split("T")[0];
-    const doc = await getFirestore().collection("users").doc(uid).collection("daily_limit").doc(dateKey).get();
+    const doc = await getFirestore()
+      .collection("users")
+      .doc(uid)
+      .collection("daily_limit")
+      .doc(dateKey)
+      .get();
     const data = doc.data() || {};
     const treeIndex = await listTrees(uid);
     res.json({

@@ -135,7 +135,58 @@ export default function Home() {
       .then(setTree)
       .catch(console.error)
       .finally(() => setIsTreeLoading(false));
-  }, [user, treeIndex?.activeTreeId]);
+
+    // Explicitly use version to trigger refetch
+    void version;
+  }, [user, treeIndex?.activeTreeId, version]);
+
+  // Sync selectedNode with updated tree
+  useEffect(() => {
+    if (!tree || !selectedNode) return;
+
+    // Helper to find node
+    const findNode = (node: any, id: string): any => {
+      if (node.id === id) return node;
+      if (node.idealStates) {
+        for (const child of node.idealStates) {
+          const found = findNode(child, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    // Check Goal
+    if (tree.goal.id === selectedNode.id) {
+      // Check if changed (excluding type which is not in tree data)
+      // We compare specific fields or just object identity/content
+      if (JSON.stringify(tree.goal) !== JSON.stringify({ ...selectedNode, type: undefined })) {
+        // Preserve type!
+        setSelectedNode({ ...tree.goal, type: "goal" } as any);
+      }
+      return;
+    }
+
+    // Check Ideals
+    const found = findNode(tree.goal, selectedNode.id);
+    if (found) {
+      // We assume valid found node is distinct from selectedNode logic check
+      // We must re-attach type from selectedNode (since ID matches, type must match)
+      // Or simply "ideal" since we searched under goal's children? (Goal is distinct)
+      // Ideally we trust selectedNode.type.
+
+      // Construct the new node object with type
+      const newNode = { ...found, type: selectedNode.type };
+
+      // Simple comparison to avoid loops
+      // Note: found doesn't have type. selectedNode does.
+      // We compare properties excluding type from selectedNode to found.
+      const { type, ...selectedNodeNoType } = selectedNode;
+      if (JSON.stringify(found) !== JSON.stringify(selectedNodeNoType)) {
+        setSelectedNode(newNode);
+      }
+    }
+  }, [tree, selectedNode]); // Run whenever tree or selectedNode updates
 
   const refreshTree = (keepSelection = false) => {
     setVersion((v) => v + 1);
@@ -189,14 +240,37 @@ export default function Home() {
     refreshTree();
   };
 
-  const handleSelectTree = async (id: string) => {
-    // Optimistic Update
-    if (treeIndex) {
-      setTreeIndex({ ...treeIndex, activeTreeId: id });
+  const fetchTreeIndex = async () => {
+    try {
+      const res = await apiFetch("/api/trees");
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
+  const handleSelectTree = async (id: string, indexData?: TreeIndex) => {
+    // Optimistic Update: Use provided indexData if available (fresh), otherwise current state
+    const baseIndex = indexData || treeIndex;
+    if (baseIndex) {
+      setTreeIndex({ ...baseIndex, activeTreeId: id });
     }
     // Background update
     await apiFetch(`/api/trees/${id}/active`, { method: "PUT" });
     refreshTree();
+  };
+
+  const handleTreePromoted = async (id: string) => {
+    const newData = await fetchTreeIndex();
+    if (newData) {
+      await handleSelectTree(id, newData);
+    } else {
+      // Fallback
+      await handleSelectTree(id);
+    }
   };
 
   const handleTreeCreated = (newTree: Tree) => {
@@ -226,11 +300,12 @@ export default function Home() {
 
   return (
     <div className="h-screen bg-stone-50 dark:bg-stone-950 flex flex-col">
+      {/* ... (Loading Overlay omitted for brevity in diff, but preserved in file logic) ... */}
       {/* Loading Overlay */}
       {isGlobalLoading && (
         <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
           <div className="flex flex-col items-center gap-4 p-8 bg-white dark:bg-stone-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-800 max-w-xs text-center relative pointer-events-auto">
-            {/* Allow dismissing if it's Decomposing */}
+            {/* ... */}
             {globalLoadingMessage?.includes("Decomposing") && (
               <button
                 onClick={() => setGlobalLoading(false)}
@@ -300,6 +375,7 @@ export default function Home() {
 
       {/* Header */}
       <header className="px-4 py-2 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex items-center gap-4">
+        {/* ... Header content ... */}
         <div className="flex items-center gap-2">
           <CompassLogo className="w-6 h-6" />
           <span className="text-lg font-bold tracking-tight text-stone-800 dark:text-stone-100">
@@ -353,10 +429,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* Spacer for Mobile to push Logout to right */}
         <div className="lg:hidden flex-1" />
 
-        {/* User Info / Menu */}
         <div className="relative">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -365,13 +439,10 @@ export default function Home() {
             <span>メニュー</span>
             <Menu className="w-4 h-4" />
           </button>
-
+          {/* ... Menu items ... */}
           {isMenuOpen && (
             <>
-              {/* Backdrop to close menu */}
               <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
-
-              {/* Dropdown Menu */}
               <div className="absolute right-0 top-full mt-2 w-56 z-50 bg-white dark:bg-stone-900 rounded-lg shadow-xl border border-stone-200 dark:border-stone-800 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                 <ul className="py-1">
                   <li>
@@ -411,7 +482,6 @@ export default function Home() {
             : ""
         }`}
       >
-        {/* Mobile Hint (Visible only on mobile when no node selected) */}
         {!selectedNode && (
           <div className="lg:hidden fixed bottom-[calc(60px+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 py-2 px-6 bg-white/90 dark:bg-stone-900/90 backdrop-blur shadow-lg border border-blue-100 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full text-sm animate-pulse whitespace-nowrap">
             <Hand className="w-4 h-4" />
@@ -427,9 +497,10 @@ export default function Home() {
             processingNodes={processingNodes}
             tree={tree}
             onUpdateTree={handleUpdateTree}
-            isLoading={isTreeLoading}
+            isLoading={isTreeLoading || isTreeIndexLoading}
             onAddTree={() => !isCreationDisabled && setCreateModalOpen(true)}
             isLimitReached={isLimitReached}
+            selectedNodeId={selectedNode?.id}
           />
         </div>
 
@@ -444,6 +515,7 @@ export default function Home() {
             onProcessingStart={handleAddProcessingNode}
             onProcessingEnd={handleRemoveProcessingNode}
             version={version}
+            onSwitchTree={handleTreePromoted}
           />
         </div>
 
@@ -459,6 +531,7 @@ export default function Home() {
             onProcessingEnd={handleRemoveProcessingNode}
             onClose={() => setIsMobilePanelOpen(false)}
             version={version}
+            onSwitchTree={handleTreePromoted}
           />
         </ControlPanelModal>
       </div>
