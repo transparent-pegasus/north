@@ -51,3 +51,15 @@ next-env.d.ts
 
 # temp
 .tmp
+
+# Android
+android/app/build/
+android/app/release/
+android/*.apk
+android/*.aab
+android/*.idsig
+android/.env.local
+android/.gradle/
+android/build/
+android/local.properties
+android/android-keystore.jks

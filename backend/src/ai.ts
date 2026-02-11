@@ -2,15 +2,15 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { defineSecret } from "firebase-functions/params";
 import { config } from "./config";
 
-export const googleApiKey = defineSecret("GOOGLE_API_KEY");
+export const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
 let genAI: GoogleGenerativeAI | null = null;
 
 function getModel() {
   if (!genAI) {
-    const apiKey = googleApiKey.value();
+    const apiKey = geminiApiKey.value();
     if (!apiKey) {
-      throw new Error("GOOGLE_API_KEY is not set");
+      throw new Error("GEMINI_API_KEY is not set");
     }
     genAI = new GoogleGenerativeAI(apiKey);
   }

@@ -466,5 +466,5 @@ app.use("/", router);
 
 export { app };
 
-import { googleApiKey } from "./ai";
-export const api = onRequest({ secrets: [googleApiKey] }, app);
+import { geminiApiKey } from "./ai";
+export const api = onRequest({ secrets: [geminiApiKey] }, app);

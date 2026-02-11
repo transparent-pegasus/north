@@ -51,9 +51,9 @@ jest.mock("../ai", () => ({
     ],
     existing: [],
   })),
-  googleApiKey: {
+  geminiApiKey: {
     value: jest.fn(() => "test-api-key"),
-    name: "GOOGLE_API_KEY",
+    name: "GEMINI_API_KEY",
   },
 }));
 

@@ -1,6 +1,7 @@
 # North Project Makefile
 
-.PHONY: build dev dev-stop dev-emu dev-front deploy-web deploy-funcs format test clean verify
+.PHONY: build dev dev-stop dev-emu dev-front deploy-web deploy-funcs format test clean verify \
+       android-build android-clean android-keystore-list
 
 # Build
 build:
@@ -52,3 +53,10 @@ verify:
 	make build-local > .tmp/build.log
 	@echo "Verification successful. Cleaning up .tmp..."
 	@powershell -Command "Remove-Item .tmp/* -Force"
+
+# Android
+android-build:
+	cd android && gradlew assembleRelease
+
+android-clean:
+	cd android && gradlew clean

@@ -110,20 +110,18 @@ export default function TitleScreen() {
               startContent={<GoogleIcon />}
               className="w-full h-14 font-bold bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 border-stone-200 dark:border-stone-700 flex items-center justify-center gap-3"
             >
-              Sign in with Google
+              Googleでログイン
             </Button>
 
-            {config.showDebug && (
-              <Button
-                onPress={handleAnonymousLogin}
-                isLoading={anonLoading}
-                variant="solid"
-                color="primary"
-                className="w-full font-medium"
-              >
-                Start Anonymously (Dev Only)
-              </Button>
-            )}
+            <Button
+              onPress={handleAnonymousLogin}
+              isLoading={anonLoading}
+              variant="flat"
+              color="default"
+              className="w-full h-12 font-medium text-stone-600 dark:text-stone-400 flex items-center justify-center"
+            >
+              ゲストとして始める
+            </Button>
           </div>
 
           {error && <p className="text-danger text-sm">{error}</p>}
