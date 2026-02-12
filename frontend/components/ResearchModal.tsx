@@ -15,6 +15,7 @@ interface ResearchModalProps {
   onUpdateTree: (tree: Tree | null) => void;
   onResearchComplete: () => void;
   setGlobalLoading: (loading: boolean | string) => void;
+  isResearchLimitReached?: boolean;
 }
 
 export default function ResearchModal({
@@ -26,6 +27,7 @@ export default function ResearchModal({
   onClose,
   onResearchComplete,
   setGlobalLoading,
+  isResearchLimitReached = false,
 }: ResearchModalProps) {
   const { showError } = useModal();
   const [activeTab, setActiveTab] = useState<"auto" | "manual">("auto");
@@ -236,10 +238,14 @@ export default function ResearchModal({
               <div className="pt-4 flex justify-end">
                 <button
                   onClick={handleAutoResearch}
-                  disabled={loading || !keywords}
+                  disabled={loading || !keywords || isResearchLimitReached}
                   className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50"
                 >
-                  {loading ? "リサーチ実行中..." : "リサーチを実行"}
+                  {isResearchLimitReached
+                    ? "リサーチを実行 (制限到達)"
+                    : loading
+                      ? "リサーチ実行中..."
+                      : "リサーチを実行"}
                 </button>
               </div>
             </div>

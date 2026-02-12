@@ -141,52 +141,48 @@ export default function Home() {
   }, [user, treeIndex?.activeTreeId, version]);
 
   // Sync selectedNode with updated tree
+  // ツリーデータの形状と selectedNode の形状は異なるため、
+  // 必要なプロパティだけを明示的に構築して同期する
   useEffect(() => {
     if (!tree || !selectedNode) return;
 
-    // Helper to find node
-    const findNode = (node: any, id: string): any => {
-      if (node.id === id) return node;
-      if (node.idealStates) {
-        for (const child of node.idealStates) {
-          const found = findNode(child, id);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
+    // Helper to find ideal state node
+    const findIdeal = (id: string) => tree.goal.idealStates.find((i) => i.id === id);
 
-    // Check Goal
     if (tree.goal.id === selectedNode.id) {
-      // Check if changed (excluding type which is not in tree data)
-      // We compare specific fields or just object identity/content
-      if (JSON.stringify(tree.goal) !== JSON.stringify({ ...selectedNode, type: undefined })) {
-        // Preserve type!
-        setSelectedNode({ ...tree.goal, type: "goal" } as any);
+      const newNode = {
+        id: tree.goal.id,
+        type: "goal" as const,
+        label: tree.goal.content,
+        content: tree.goal.content,
+        childCount: tree.goal.idealStates.length,
+        pendingProposal: tree.goal.pendingProposal,
+      };
+
+      if (JSON.stringify(newNode) !== JSON.stringify(selectedNode)) {
+        setSelectedNode(newNode);
       }
       return;
     }
 
-    // Check Ideals
-    const found = findNode(tree.goal, selectedNode.id);
+    const found = findIdeal(selectedNode.id);
     if (found) {
-      // We assume valid found node is distinct from selectedNode logic check
-      // We must re-attach type from selectedNode (since ID matches, type must match)
-      // Or simply "ideal" since we searched under goal's children? (Goal is distinct)
-      // Ideally we trust selectedNode.type.
+      const newNode = {
+        id: found.id,
+        type: "ideal" as const,
+        label: found.content,
+        content: found.content,
+        condition: found.condition?.content,
+        currentState: found.currentState?.content,
+        researchSpec: found.researchSpec,
+        pendingProposal: found.pendingProposal,
+      };
 
-      // Construct the new node object with type
-      const newNode = { ...found, type: selectedNode.type };
-
-      // Simple comparison to avoid loops
-      // Note: found doesn't have type. selectedNode does.
-      // We compare properties excluding type from selectedNode to found.
-      const { type, ...selectedNodeNoType } = selectedNode;
-      if (JSON.stringify(found) !== JSON.stringify(selectedNodeNoType)) {
+      if (JSON.stringify(newNode) !== JSON.stringify(selectedNode)) {
         setSelectedNode(newNode);
       }
     }
-  }, [tree, selectedNode]); // Run whenever tree or selectedNode updates
+  }, [tree, selectedNode]);
 
   const refreshTree = (keepSelection = false) => {
     setVersion((v) => v + 1);

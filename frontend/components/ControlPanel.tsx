@@ -782,25 +782,11 @@ export default function ControlPanel({
           </div>
           <div className="space-y-2">
             <button
-              onClick={() => {
-                if (usage.research >= LIMITS.research) {
-                  showError("本日のリサーチ回数制限(3回)に達しました。明日またご利用ください。");
-
-                  return;
-                }
-                setIsResearchModalOpen(true);
-              }}
-              className={`w-full py-2 text-sm font-medium rounded disabled:opacity-40 flex items-center justify-center gap-2 transition-colors ${
-                usage.research >= LIMITS.research
-                  ? "bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-600 cursor-not-allowed"
-                  : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-              }`}
+              onClick={() => setIsResearchModalOpen(true)}
+              className="w-full py-2 text-sm font-medium rounded disabled:opacity-40 flex items-center justify-center gap-2 transition-colors bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30"
             >
               <BookOpen className="w-4 h-4" />
               リサーチ
-              {usage.research >= LIMITS.research && (
-                <span className="ml-2 text-xs opacity-70">(制限到達)</span>
-              )}
             </button>
             <div className="border-t border-stone-100 dark:border-stone-800 my-2" />
             <button
@@ -891,6 +877,7 @@ export default function ControlPanel({
           fetchUsage();
         }}
         setGlobalLoading={setGlobalLoading}
+        isResearchLimitReached={usage.research >= LIMITS.research}
       />
 
       <RefineProposalModal
