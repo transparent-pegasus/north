@@ -1,6 +1,11 @@
+import { createRequire } from "node:module";
+
 import perfectionist from "eslint-plugin-perfectionist";
 import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
+
+const require = createRequire(import.meta.url);
+const nextPlugin = require("@next/eslint-plugin-next");
 
 export default tseslint.config(
   {
@@ -18,10 +23,13 @@ export default tseslint.config(
   {
     files: ["**/*.{js,jsx,ts,tsx}"],
     plugins: {
+      "@next/next": nextPlugin,
       perfectionist,
       "unused-imports": unusedImports,
     },
     rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs["core-web-vitals"].rules,
       "padding-line-between-statements": [
         "error",
         { blankLine: "always", next: "*", prev: ["const", "let", "var"] },

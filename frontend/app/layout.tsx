@@ -17,23 +17,11 @@ const geistMono = Geist_Mono({
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "North",
-  },
   description: "Goal decomposition and research assistant",
-  formatDetection: {
-    telephone: false,
-  },
   icons: {
-    apple: "/icon-512.png",
-    icon: [
-      { type: "image/png", url: "/icon-512.png" },
-      { type: "image/svg+xml", url: "/icon.svg" },
-    ],
+    apple: "/icon-192x192.png",
+    icon: "/icon-192x192.png",
   },
-  manifest: "/manifest.json",
   title: "North",
 };
 
@@ -53,6 +41,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" type="image/png" href="/icon-192x192.png" />
+        <meta name="theme-color" content="#ffffff" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
           <GoogleAnalytics />

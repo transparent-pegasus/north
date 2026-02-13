@@ -55,8 +55,25 @@ verify:
 	@powershell -Command "Remove-Item .tmp/* -Force"
 
 # Android
+android-release:
+	@powershell -ExecutionPolicy Bypass -Command "\
+		$$path = 'twa-manifest.json'; \
+		$$content = Get-Content $$path -Raw; \
+		if ($$content -match '\"appVersionCode\":\s*(\d+)') { \
+			$$newCode = [int]$$Matches[1] + 1; \
+			$$content -replace '\"appVersionCode\":\s*\d+', ('\"appVersionCode\": ' + $$newCode) | Set-Content $$path -Encoding utf8; \
+			Write-Host 'Incremented versionCode to' $$newCode; \
+		} else { \
+			Write-Error 'Could not find appVersionCode'; \
+			exit 1; \
+		}"
+	make android-build
+
 android-build:
-	cd android && gradlew assembleRelease
+	@pwsh -ExecutionPolicy Bypass -File scripts/update_android_project.ps1
+	cd android && gradlew bundleRelease
+	@powershell -ExecutionPolicy Bypass -Command "Copy-Item android/app/build/outputs/bundle/release/app-release.aab android/app-release.aab -Force"
+	@echo "Build complete. AAB is located at: android/app-release.aab"
 
 android-clean:
 	cd android && gradlew clean
