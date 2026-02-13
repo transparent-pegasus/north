@@ -22,16 +22,12 @@ function getUserRoot(userId: string) {
 // --- Index Management ---
 
 async function getIndex(userId: string): Promise<TreeIndex> {
-  console.log(`[Firestore] Fetching index for user ${userId}`);
   try {
     const doc = await getUserRoot(userId).collection(META_COLLECTION).doc(INDEX_DOC).get();
 
     if (doc.exists) {
-      console.log(`[Firestore] Index found`);
-
       return doc.data() as TreeIndex;
     }
-    console.log(`[Firestore] Index not found, creating initial`);
     const initial: TreeIndex = { activeTreeId: "", trees: [] };
 
     await saveIndex(userId, initial);
@@ -44,10 +40,8 @@ async function getIndex(userId: string): Promise<TreeIndex> {
 }
 
 async function saveIndex(userId: string, index: TreeIndex): Promise<void> {
-  console.log(`[Firestore] Saving index for user ${userId}`);
   try {
     await getUserRoot(userId).collection(META_COLLECTION).doc(INDEX_DOC).set(index);
-    console.log(`[Firestore] Index saved successfully`);
   } catch (error) {
     console.error(`[Firestore] Error in saveIndex:`, error);
     throw error;

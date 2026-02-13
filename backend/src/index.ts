@@ -44,12 +44,6 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// Logger
-app.use((req, _res, next) => {
-  console.log(`[Request] ${req.method} ${req.originalUrl} -> ${req.url}`);
-  next();
-});
-
 // --- Auth Middleware ---
 
 const checkAuthMiddleware: express.RequestHandler = async (req, res, next) => {
@@ -183,7 +177,6 @@ router.get("/trees/:id", async (req, res) => {
   try {
     const uid = req.user.uid;
     const id = req.params.id;
-    console.log(`[API] getTree: id=${id}, uid=${uid}`);
     const tree = await getTree(uid, id);
     if (!tree) {
       res.status(404).json({ error: "Tree not found" });

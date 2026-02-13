@@ -29,8 +29,6 @@ async function searchWithPuppeteer(query: string, source: string): Promise<Searc
 
   const fullQuery = `site:${site} ${query}`;
 
-  console.log(`DEBUG: Puppeteer Searching for: ${fullQuery}`);
-
   let browser: any;
 
   try {
@@ -220,7 +218,6 @@ export async function executeResearch(url: string): Promise<string> {
   let browser: any;
 
   try {
-    console.log(`DEBUG: Executing research on ${url}`);
     browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
       headless: true,
@@ -243,8 +240,6 @@ export async function executeResearch(url: string): Promise<string> {
 
       return document.body.innerText;
     });
-
-    console.log(`DEBUG: Extracted ${content.length} chars. sending to AI...`);
 
     return await summarizeContent(content);
   } catch (error) {

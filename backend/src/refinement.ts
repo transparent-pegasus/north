@@ -44,10 +44,7 @@ Output JSON:
 }
 `;
 
-      console.log("DEBUG: Ideal Refine Prompt:", prompt);
       const result = await generateContemplation(prompt, null);
-
-      console.log("DEBUG: Ideal Refine Result:", result);
 
       if (result) {
         await setElementProposal(uid, elementId, "refinement", "completed", result);
@@ -101,10 +98,7 @@ Output JSON:
 }
 `;
 
-    console.log("DEBUG: Refine Prompt:", prompt);
     const result = await generateContemplation(prompt, null);
-
-    console.log("DEBUG: Refine Result:", result);
 
     if (result) {
       await setElementProposal(uid, elementId, "refinement", "completed", result);

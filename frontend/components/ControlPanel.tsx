@@ -129,8 +129,6 @@ export default function ControlPanel({
         return;
       }
 
-      console.log("DEBUG: Found pending proposal", proposal);
-
       if (proposal.type === "decomposition") {
         const data = proposal.data;
 
@@ -311,8 +309,6 @@ export default function ControlPanel({
 
       const data = await res.json();
 
-      console.log("DEBUG: Received Decompose Proposal:", data);
-
       if (!res.ok) {
         console.error("Decomposition failed:", data);
         await handleError(data, "分解に失敗しました");
@@ -404,8 +400,6 @@ export default function ControlPanel({
         timeout: 120000,
       });
       const data = await res.json();
-
-      console.log("DEBUG: Received Refine Data:", data);
 
       if (!res.ok) {
         await handleError(data, "提案の取得に失敗しました");

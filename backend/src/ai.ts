@@ -64,8 +64,6 @@ Output JSON:
 
     const text = result.response.text();
 
-    console.log("DEBUG: AI Raw Response:", text);
-
     return JSON.parse(text);
   } catch (e) {
     console.error("Failed to generate/parse AI response", e);

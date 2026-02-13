@@ -73,10 +73,7 @@ export async function decompose(
 
       const prompt = buildPrompt(goal, currentIdeals, addedIds, slotsAvailable, loopIndex);
 
-      console.log(`DEBUG: Decomposition Loop ${loopIndex + 1} Prompt:`, prompt);
       const result = await generateContemplation(prompt, null);
-
-      console.log(`DEBUG: Decomposition Loop ${loopIndex + 1} Result:`, result);
 
       if (result) {
         finalProposal = parseResult(result);
