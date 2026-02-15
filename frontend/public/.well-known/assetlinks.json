@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.transparent_pegasus.north",
+      "sha256_cert_fingerprints": [
+        "12:44:4B:C2:65:42:86:0C:5B:AF:E3:5D:01:5E:28:67:20:74:40:C4:F3:2C:96:93:BD:46:13:75:48:CF:1D:54"
+      ]
+    }
+  }
+]
