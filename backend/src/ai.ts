@@ -19,7 +19,7 @@ let anthropic: Anthropic | null = null;
 
 function getGeminiModel() {
   if (!genAI) {
-    const apiKey = geminiApiKey!.value();
+    const apiKey = geminiApiKey?.value();
     if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
     genAI = new GoogleGenerativeAI(apiKey);
   }
@@ -28,7 +28,7 @@ function getGeminiModel() {
 
 function getAnthropicClient() {
   if (!anthropic) {
-    const apiKey = claudeApiKey!.value();
+    const apiKey = claudeApiKey?.value();
     if (!apiKey) throw new Error("CLAUDE_API_KEY is not set");
     anthropic = new Anthropic({ apiKey });
   }
@@ -66,7 +66,7 @@ Output JSON only.
       const result = await retryWithBackoff(() =>
         withTimeout(
           model.generateContent({
-            contents: [{ parts: [{ text: systemPrompt + "\nInput:\n" + prompt }], role: "user" }],
+            contents: [{ parts: [{ text: `${systemPrompt}\nInput:\n${prompt}` }], role: "user" }],
             generationConfig: {
               responseMimeType: "application/json",
             },
@@ -123,7 +123,7 @@ You are a research assistant. Summarize the following content in Japanese, focus
       const result = await retryWithBackoff(() =>
         withTimeout(
           model.generateContent({
-            contents: [{ parts: [{ text: systemPrompt + "\n" + userContent }], role: "user" }],
+            contents: [{ parts: [{ text: `${systemPrompt}\n${userContent}` }], role: "user" }],
           }),
           TIMEOUT_MS,
         ),

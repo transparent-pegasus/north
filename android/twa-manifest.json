@@ -21,7 +21,7 @@
     "alias": "android"
   },
   "appVersionName": "1.3",
-  "appVersionCode": 7,
+  "appVersionCode": 9,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://north-c409d.web.app/manifest.json",

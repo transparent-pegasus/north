@@ -533,7 +533,9 @@ export default function ControlPanel({
     "p-3 bg-white dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800";
 
   return (
-    <div className={`flex flex-col gap-3 relative ${isPanelDisabled ? "pointer-events-none opacity-50" : ""}`}>
+    <div
+      className={`flex flex-col gap-3 relative ${isPanelDisabled ? "pointer-events-none opacity-50" : ""}`}
+    >
       {isPanelDisabled && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 dark:bg-stone-950/30 backdrop-blur-[1px] rounded-lg">
           <div className="w-8 h-8 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
