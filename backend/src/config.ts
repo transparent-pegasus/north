@@ -9,6 +9,9 @@ export const config = {
   gemini: {
     model: "gemini-3-flash-preview",
   },
+  claude: {
+    model: "claude-sonnet-4-5",
+  },
 
   // Feature Rate Limits (Daily)
   limits: {

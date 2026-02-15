@@ -512,6 +512,7 @@ export default function Home() {
             onProcessingEnd={handleRemoveProcessingNode}
             version={version}
             onSwitchTree={handleTreePromoted}
+            processingNodes={processingNodes}
           />
         </div>
 
@@ -528,6 +529,7 @@ export default function Home() {
             onClose={() => setIsMobilePanelOpen(false)}
             version={version}
             onSwitchTree={handleTreePromoted}
+            processingNodes={processingNodes}
           />
         </ControlPanelModal>
       </div>

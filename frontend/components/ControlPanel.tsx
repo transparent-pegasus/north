@@ -35,6 +35,7 @@ interface ControlPanelProps {
   onClose?: () => void;
   onSwitchTree?: (id: string) => void;
   version: number;
+  processingNodes?: Set<string>;
 }
 
 export default function ControlPanel({
@@ -48,6 +49,7 @@ export default function ControlPanel({
   onClose,
   onSwitchTree,
   version,
+  processingNodes,
 }: ControlPanelProps) {
   const { showConfirm, showError } = useModal();
   const [loading, setLoading] = useState(false);
@@ -514,11 +516,29 @@ export default function ControlPanel({
     );
   }
 
+  // Calculate disabled state
+  let isPanelDisabled = false;
+  if (processingNodes) {
+    if (processingNodes.has(selectedNode.id)) {
+      isPanelDisabled = true;
+    } else if (selectedNode.type === "ideal" && tree) {
+      // If parent goal is processing, disable ideal states too
+      if (processingNodes.has(tree.goal.id)) {
+        isPanelDisabled = true;
+      }
+    }
+  }
+
   const cardClass =
     "p-3 bg-white dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col gap-3 relative ${isPanelDisabled ? "pointer-events-none opacity-50" : ""}`}>
+      {isPanelDisabled && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 dark:bg-stone-950/30 backdrop-blur-[1px] rounded-lg">
+          <div className="w-8 h-8 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
       {/* Primary Card: Element Edit */}
       <div className={cardClass}>
         <div className="flex items-center gap-2 mb-3">

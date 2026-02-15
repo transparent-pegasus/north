@@ -205,14 +205,27 @@ interface NodeProps {
   processingNodes?: Set<string>;
 }
 
-function AddButton({ label, onClick }: { onClick: () => void; label: string }) {
+function AddButton({
+  label,
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  label: string;
+  disabled?: boolean;
+}) {
   return (
     <button
+      disabled={disabled}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
-      className="w-full py-1.5 text-[10px] font-medium text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 rounded border border-dashed border-stone-200 dark:border-stone-700 transition-all tracking-wide"
+      className={`w-full py-1.5 text-[10px] font-medium rounded border border-dashed transition-all tracking-wide ${
+        disabled
+          ? "border-stone-100 dark:border-stone-800 text-stone-300 dark:text-stone-700 cursor-not-allowed"
+          : "text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border-stone-200 dark:border-stone-700"
+      }`}
     >
       + {label}
     </button>
@@ -225,7 +238,7 @@ function GoalNode({ goal, onAdd, ...props }: { goal: Goal } & NodeProps) {
     props.processingNodes?.has(goal.id) || goal.pendingProposal?.status === "processing";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col gap-2 ${isProcessing ? "opacity-70 pointer-events-none" : ""}`}>
       <button
         onClick={() =>
           !isProcessing &&
@@ -243,8 +256,10 @@ function GoalNode({ goal, onAdd, ...props }: { goal: Goal } & NodeProps) {
           isSelected
             ? "bg-stone-100 dark:bg-stone-800 border-stone-400 dark:border-stone-600"
             : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700"
-        } ${isProcessing ? "opacity-70 cursor-not-allowed" : ""}`}
+        }`}
       >
+        {/* Spinner logic below... actually we can simplify by wrapping entire node in pointer-events-none if goal is processing as per user request */}
+        {/* But we need to show spinner on the Goal button specifically? Original code had it. */}
         {isProcessing && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-stone-950/50 rounded-lg z-10">
             <div className="w-5 h-5 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
@@ -266,9 +281,19 @@ function GoalNode({ goal, onAdd, ...props }: { goal: Goal } & NodeProps) {
 
       {/* Ideal States */}
       <div className="flex flex-col gap-4 pl-4 ml-2 border-l border-dashed border-stone-200 dark:border-stone-800">
-        <AddButton onClick={() => onAdd(goal.id)} label="理想の状態を追加" />
+        <AddButton
+          onClick={() => onAdd(goal.id)}
+          label="理想の状態を追加"
+          disabled={isProcessing}
+        />
         {goal.idealStates.map((ideal) => (
-          <IdealStateNode key={ideal.id} ideal={ideal} onAdd={onAdd} {...props} />
+          <IdealStateNode
+            key={ideal.id}
+            ideal={ideal}
+            onAdd={onAdd}
+            isParentProcessing={isProcessing}
+            {...props}
+          />
         ))}
       </div>
     </div>
@@ -307,15 +332,6 @@ function ResearchResultItem({ nodeId, onDeleteResearch, onRefresh, res }: Resear
       if (!resp.ok) {
         throw new Error("Failed to delete");
       }
-      // No need to refresh entire tree if successful, as local state is already updated.
-      // But we call onRefresh to sync eventual consistency or side effects if any.
-      // However, to keep UI snappy, maybe skip it or do it silently?
-      // User asked to eliminate lag. The lag is from waiting for API then Refresh.
-      // We already updated UI. Refreshing now might just re-render same thing.
-      // Better to just let it be, or refresh silently without loading state (but TreeList uses apiFetch which doesn't trigger global loading, just local setTree).
-      // Let's Skip explicit refresh for better UX, or do it?
-      // If we skip, we rely 100% on local logic matching server.
-      // Let's skip to maximize speed perception, unless error.
     } catch (err) {
       console.error(err);
       showError("削除に失敗しました");
@@ -366,14 +382,20 @@ function ResearchResultItem({ nodeId, onDeleteResearch, onRefresh, res }: Resear
   );
 }
 
-function IdealStateNode({ ideal, ...props }: { ideal: IdealState } & NodeProps) {
+interface IdealStateNodeProps extends NodeProps {
+  ideal: IdealState;
+  isParentProcessing?: boolean;
+}
+
+function IdealStateNode({ ideal, isParentProcessing, ...props }: IdealStateNodeProps) {
   const isSelected = props.selectedId === ideal.id;
-  const isProcessing =
+  const isSelfProcessing =
     props.processingNodes?.has(ideal.id) || ideal.pendingProposal?.status === "processing";
+  const isProcessing = isSelfProcessing || isParentProcessing;
   const hasResearch = ideal.researchResults && ideal.researchResults.length > 0;
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className={`flex flex-col gap-1 ${isProcessing ? "opacity-70 pointer-events-none" : ""}`}>
       <button
         onClick={() =>
           !isProcessing &&
@@ -393,9 +415,9 @@ function IdealStateNode({ ideal, ...props }: { ideal: IdealState } & NodeProps) 
           isSelected
             ? "bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-700"
             : "bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-900/30 hover:border-amber-300 dark:hover:border-amber-800"
-        } ${isProcessing ? "opacity-70 cursor-not-allowed" : ""}`}
+        }`}
       >
-        {isProcessing && (
+        {isSelfProcessing && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-stone-950/50 rounded-lg z-10">
             <div className="w-5 h-5 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
           </div>
@@ -435,13 +457,14 @@ function IdealStateNode({ ideal, ...props }: { ideal: IdealState } & NodeProps) 
       {hasResearch && (
         <div className="ml-4 pl-3 border-l-2 border-blue-200 dark:border-blue-800 space-y-1">
           {ideal.researchResults.map((res) => (
-            <ResearchResultItem
-              key={res.id}
-              res={res}
-              nodeId={ideal.id}
-              onRefresh={props.onRefresh}
-              onDeleteResearch={props.onDeleteResearch}
-            />
+            <div key={res.id} className={isProcessing ? "pointer-events-none opacity-50" : ""}>
+              <ResearchResultItem
+                res={res}
+                nodeId={ideal.id}
+                onRefresh={props.onRefresh}
+                onDeleteResearch={props.onDeleteResearch}
+              />
+            </div>
           ))}
         </div>
       )}

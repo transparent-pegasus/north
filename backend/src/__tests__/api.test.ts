@@ -55,6 +55,7 @@ jest.mock("../ai", () => ({
     value: jest.fn(() => "test-api-key"),
     name: "GEMINI_API_KEY",
   },
+  secrets: [],
 }));
 
 // Mock Research functions
