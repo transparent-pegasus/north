@@ -1,4 +1,4 @@
-﻿{
+{
   "packageId": "com.transparent_pegasus.north",
   "host": "north-c409d.web.app",
   "name": "North",
@@ -13,15 +13,15 @@
   "backgroundColor": "#FFFFFF",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://north-c409d.web.app/icon-512.png",
-  "maskableIconUrl": "https://north-c409d.web.app/icon-maskable-512.png",
+  "iconUrl": "https://north-c409d.web.app/icon-512x512.png",
+  "maskableIconUrl": "https://north-c409d.web.app/icon-512x512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android-keystore.jks",
     "alias": "android"
   },
   "appVersionName": "1.3",
-  "appVersionCode": 5,
+  "appVersionCode": 6,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://north-c409d.web.app/manifest.json",
@@ -51,4 +51,3 @@
   "displayOverride": [],
   "appVersion": "1.3"
 }
-
